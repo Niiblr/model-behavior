@@ -4,6 +4,7 @@
 ![header](https://raw.githubusercontent.com/Niiblr/model-behavior/master/header.jpg)
 
 > *Multiple AIs walk into a room.*
+
 This is an expanded version based on [Andrej Karpathy's llm-council](https://github.com/karpathy/llm-council). It builds on the original concept of sending a question to multiple LLMs, having them rank each other, and synthesizing an answer.
 
 The current version introduces a four-phase process modeled on human debate. It also adds new modes, additional providers, streaming, data exports, and a conversational interface.
