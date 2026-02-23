@@ -1,0 +1,221 @@
+/* ========================================
+   UNIFIED STAGES STYLING - ALL CONSISTENT
+   ======================================== */
+
+/* Stage Tabs - Universal Styling */
+.stage1-tabs,
+.stage2-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.stage1-tab,
+.stage2-tab {
+  padding: 12px 20px;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.stage1-tab:hover,
+.stage2-tab:hover {
+  background: #f8fafc;
+  color: #2563eb;
+  border-color: #cbd5e1;
+}
+
+.stage1-tab.active,
+.stage2-tab.active {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  font-weight: 600;
+}
+
+.stage1-tab.active::after,
+.stage2-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2563eb;
+}
+
+/* Stage Content - Universal Styling */
+.stage1-content,
+.stage2-content {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Stage 2 Specific - Ranking Display */
+.stage2-ranking {
+  margin-top: 16px;
+  padding: 20px;
+  background-color: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+}
+
+.stage2-ranking h4 {
+  color: #2563eb;
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stage2-ranking ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.stage2-ranking li {
+  padding: 8px 0;
+  color: #1e293b;
+  font-size: 14px;
+  border-bottom: 1px solid #e2e8f0;
+  line-height: 1.6;
+}
+
+.stage2-ranking li:last-child {
+  border-bottom: none;
+}
+
+.stage2-ranking li strong {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Aggregate Rankings */
+.aggregate-rankings {
+  margin-top: 24px;
+  padding: 24px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-radius: 12px;
+  border: 1px solid #93c5fd;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+.aggregate-rankings h4 {
+  color: #1e40af;
+  margin-bottom: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aggregate-rankings p {
+  color: #475569;
+  font-size: 14px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.ranking-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #93c5fd;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+}
+
+.ranking-item:hover {
+  border-color: #60a5fa;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+.ranking-position {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 20px;
+  min-width: 45px;
+}
+
+.ranking-model {
+  flex: 1;
+  color: #1e293b;
+  font-weight: 500;
+  margin: 0 16px;
+  font-size: 15px;
+}
+
+.ranking-score {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Stage 3 - Final Synthesis */
+.stage3-synthesis {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #6ee7b7;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.stage3-synthesis .markdown-content {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid #6ee7b7;
+}
+
+.stage3-synthesis .markdown-content h1,
+.stage3-synthesis .markdown-content h2,
+.stage3-synthesis .markdown-content h3 {
+  color: #059669;
+}
+
+.stage3-synthesis .markdown-content strong {
+  color: #047857;
+}
+
+.stage3-synthesis .markdown-content code {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+/* Unified Typography */
+.stage1 h3,
+.stage2 h3,
+.stage3 h3 {
+  color: #2563eb;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Unified Paragraph Styling in Stage 2 */
+.stage2 > p {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}

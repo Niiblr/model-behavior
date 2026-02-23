@@ -1,0 +1,169 @@
+.hybrid-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.hybrid-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  border-radius: 10px;
+  color: white;
+}
+
+.hybrid-badge {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+}
+
+.hybrid-header-sub {
+  font-size: 12px;
+  color: #a5b4fc;
+}
+
+.hybrid-phase-block {
+  border: 1.5px solid;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hybrid-phase-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+}
+
+.hybrid-phase-header:hover {
+  filter: brightness(0.97);
+}
+
+.hybrid-phase-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.hybrid-phase-subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+  flex: 1;
+}
+
+.hybrid-phase-toggle {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.hybrid-phase-body {
+  padding: 0 16px 16px;
+}
+
+.hybrid-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hybrid-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hybrid-tab-btn {
+  padding: 5px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 20px;
+  background: white;
+  color: #4b5563;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hybrid-tab-btn:hover {
+  background: #f3f4f6;
+}
+
+.hybrid-tab-btn.active {
+  background: #1e40af;
+  color: white;
+  border-color: #1e40af;
+}
+
+.hybrid-tab-content {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.hybrid-model-label {
+  font-size: 11px;
+  font-family: monospace;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.hybrid-markdown {
+  line-height: 1.75;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.hybrid-markdown p {
+  margin: 0.5em 0;
+}
+
+.hybrid-markdown h1,
+.hybrid-markdown h2,
+.hybrid-markdown h3 {
+  color: #111827;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+}
+
+.hybrid-markdown code {
+  background: #f1f5f9;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.hybrid-markdown ul,
+.hybrid-markdown ol {
+  padding-left: 20px;
+}
+
+.hybrid-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hybrid-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
