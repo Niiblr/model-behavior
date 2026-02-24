@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Tuple
 from .providers import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_CONFIG
+from .config import COUNCIL_MODELS, HYBRID_COUNCIL_MODELS, CHAIRMAN_CONFIG, DEVILS_ADVOCATE_CONFIG
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -348,6 +348,8 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     }
 
     return stage1_results, stage2_results, stage3_result, metadata
+
+
 # ============================================================================
 # HYBRID COUNCIL MODE
 # ============================================================================
@@ -363,9 +365,15 @@ def _build_responses_text(results: List[Dict[str, Any]]) -> str:
 async def hybrid_phase1_socratic(user_query: str) -> List[Dict[str, Any]]:
     """
     Hybrid Phase 1 (Socratic): All models give their initial answer.
-    Same as Stage 1 in council mode — establishes shared understanding.
+    Kimi K2 is excluded here so it arrives fresh as Devil's Advocate in Phase 3.
     """
-    return await stage1_collect_responses(user_query)
+    messages = [{"role": "user", "content": user_query}]
+    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages)
+    return [
+        {"model": name, "response": r.get('content', '')}
+        for name, r in responses.items()
+        if r is not None
+    ]
 
 
 async def hybrid_phase2_debate(
@@ -395,7 +403,7 @@ Now it is YOUR turn to engage in the debate. Read all the responses above carefu
 Be direct and intellectually honest. Do not simply summarize the others — engage with them critically. It is perfectly fine to strongly disagree. Reference specific models or points when you respond to them."""
 
     messages = [{"role": "user", "content": debate_prompt}]
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages)
 
     return [
         {"model": name, "response": r.get('content', '')}
@@ -410,8 +418,8 @@ async def hybrid_phase3_devils_advocate(
     phase2_results: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Hybrid Phase 3 (Devil's Advocate): The Chairman identifies the emerging
-    consensus and argues against it as forcefully as possible.
+    Hybrid Phase 3 (Devil's Advocate): A dedicated model separate from the
+    Chairman identifies the emerging consensus and argues against it forcefully.
     """
     p1_text = _build_responses_text(phase1_results)
     p2_text = _build_responses_text(phase2_results)
@@ -437,14 +445,15 @@ not to be agreeable. Even if you personally agree with the consensus, argue agai
 
     messages = [{"role": "user", "content": da_prompt}]
 
+    # Use the dedicated Devil's Advocate model (separate from Chairman)
     response = await query_model(
-        CHAIRMAN_CONFIG["provider"],
-        CHAIRMAN_CONFIG["model"],
+        DEVILS_ADVOCATE_CONFIG["provider"],
+        DEVILS_ADVOCATE_CONFIG["model"],
         messages
     )
 
     return {
-        "model": f"Devil's Advocate ({CHAIRMAN_CONFIG['name']})",
+        "model": f"Devil's Advocate ({DEVILS_ADVOCATE_CONFIG['name']})",
         "response": response.get('content', '') if response else "Error: Devil's Advocate failed to respond."
     }
 

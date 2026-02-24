@@ -40,7 +40,7 @@ COUNCIL_MODELS = [
     # --- Direct API ---
     {
         "provider": gemini,
-        "model": "gemini-3-flash-preview",
+        "model": "gemini-flash-latest",
         "name": "Gemini 3 Flash"
     },
 
@@ -62,11 +62,6 @@ COUNCIL_MODELS = [
     },
     {
         "provider": ollama,
-        "model": "deepseek-v3.1:671b-cloud",
-        "name": "DeepSeek V3.1 671B"
-    },
-    {
-        "provider": ollama,
         "model": "minimax-m2.5:cloud",
         "name": "Minimax M2.5"
     },
@@ -75,17 +70,48 @@ COUNCIL_MODELS = [
         "model": "qwen3-next:80b-cloud",
         "name": "Qwen3 80B"
     },
+
+    # --- OpenRouter (free tier) ---
+    {
+        "provider": openrouter,
+        "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+        "name": "Dolphin Mistral 24B"
+    },
+    {
+        "provider": openrouter,
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
+        "name": "Llama 3.3 70B"
+    },
+    {
+        "provider": openrouter,
+        "model": "nousresearch/hermes-3-llama-3.1-405b:free",
+        "name": "Hermes 3 405B"
+    },
 ]
 
 # Filter out any models whose provider wasn't initialized (missing API key)
 COUNCIL_MODELS = [m for m in COUNCIL_MODELS if m["provider"] is not None]
 
-# Chairman model
+# Chairman model — synthesizes the final answer
 CHAIRMAN_CONFIG = {
     "provider": ollama,
     "model": "deepseek-v3.1:671b-cloud",
     "name": "Chairman DeepSeek V3.1 671B"
 }
+
+# Devil's Advocate model — challenges the emerging consensus in hybrid mode
+DEVILS_ADVOCATE_CONFIG = {
+    "provider": ollama,
+    "model": "kimi-k2-thinking:cloud",
+    "name": "Devil's Advocate Kimi K2 Thinking"
+}
+
+# Hybrid mode council — same as COUNCIL_MODELS but without the Devil's Advocate
+# so it arrives fresh in Phase 3 with no prior positions
+HYBRID_COUNCIL_MODELS = [
+    m for m in COUNCIL_MODELS
+    if m["model"] != DEVILS_ADVOCATE_CONFIG["model"]
+]
 
 # Data directory for conversation storage
 DATA_DIR = "data/conversations"
