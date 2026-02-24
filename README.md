@@ -36,7 +36,7 @@ The classic Karpathy 3-stage process:
 A more conversational 4-phase process inspired by how humans actually debate:
 1. **Phase 1 (Socratic)** — All models form their initial understanding
 2. **Phase 2 (Debate)** — Each model reads the others' answers and agrees, disagrees, or adds nuance
-3. **Phase 3 (Devil's Advocate)** — The Chairman challenges the emerging consensus head-on
+3. **Phase 3 (Devil's Advocate)** — One model challenges the emerging consensus head-on
 4. **Phase 4 (Synthesis)** — The Chairman delivers a final answer informed by the full debate
 
 ---
