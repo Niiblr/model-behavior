@@ -19,7 +19,7 @@ You can run the **original Council mode** — [Karpathy's](https://github.com/ka
 | Council mode | 3-stage (original) | ✅ Preserved with minor UI changes |
 | Hybrid mode | ❌ | ✅ 4-phase: Socratic → Debate → Devil's Advocate → Synthesis |
 | Export | ❌ | ✅ Markdown and HTML (both modes) |
-| UI | ✅ | ✅ Improved UI for readibility and clarity |
+| UI | ✅ | ✅ Improved UI for readability and clarity |
 
 ---
 
@@ -163,9 +163,11 @@ Run this to get the latest version:
 git pull origin main
 ```
 
+---
 ## Changelog
 Consult changes [here](CHANGELOG.md)
 
+---
 ## Tech Stack
 
 - **Backend:** FastAPI (Python), async, multi-provider LLM support
