@@ -19,12 +19,9 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
 
   const modeTooltips = {
     council: '🏛️ Council Mode\n\nA structured 3-stage process:\n• Stage 1: Each AI model independently forms its own answer\n• Stage 2: Models evaluate and rank each other\'s responses\n• Stage 3: A Chairman AI synthesizes the best final answer',
-    hybrid: '🔀 Hybrid Mode\n\nA dynamic 4-phase debate process:\n• Phase 1: Models form initial understanding (Socratic)\n• Phase 2: Models debate and challenge each other\n• Phase 3: A Devil\'s Advocate challenges the consensus\n• Phase 4: A Chairman delivers the final synthesis',
+    hybrid: '🔀 Debate Mode\n\nA dynamic 4-phase debate process:\n• Phase 1: Models form initial understanding (Socratic)\n• Phase 2: Models debate and challenge each other\n• Phase 3: A Devil\'s Advocate challenges the consensus\n• Phase 4: A Chairman delivers the final synthesis',
   };
 
-  // Detect mode from existing messages and lock it.
-  // Hybrid messages have mode='hybrid' explicitly; council messages may have no mode field
-  // but will have stage1/stage2/stage3 data, so we infer 'council' from those.
   const conversationMode = (() => {
     const firstAssistant = messages.find(m => m.role === 'assistant');
     if (!firstAssistant) return null;
@@ -189,7 +186,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
         case 'hybrid_phase2': return '⚔️ Phase 2: Models are debating and challenging each other...';
         case 'hybrid_phase3': return '😈 Phase 3: Devil\'s Advocate is challenging the consensus...';
         case 'hybrid_phase4': return '✨ Phase 4: Chairman is delivering the final synthesis...';
-        default: return 'Hybrid Council is thinking...';
+        default: return 'Debate Mode Council is thinking...';
       }
     }
     switch (loadingStage) {
@@ -200,7 +197,6 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
     }
   };
 
-  // Badge shown on each assistant message
   const ModeBadge = ({ msgMode }) => {
     const isHybrid = msgMode === 'hybrid';
     return (
@@ -218,7 +214,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
         marginBottom: '8px',
         userSelect: 'none',
       }}>
-        {isHybrid ? '🔀 Hybrid' : '🏛️ Council'}
+        {isHybrid ? '🔀 Debate' : '🏛️ Council'}
       </div>
     );
   };
@@ -226,7 +222,6 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   return (
     <div className="chat-interface">
 
-      {/* Tooltip portal */}
       {tooltip.visible && (
         <div style={{
           position: 'fixed',
@@ -352,7 +347,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
                 transition: 'opacity 0.2s',
               }}
             >
-              {isHybrid ? '🔀 Hybrid' : '🏛️ Council'}
+              {isHybrid ? '🔀 Debate' : '🏛️ Council'}
             </button>
           );
         })}
@@ -400,7 +395,6 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
               </div>
             ) : (
               <div className="assistant-message">
-                {/* Per-message mode badge */}
                 <ModeBadge msgMode={message.mode} />
 
                 {message.mode === 'hybrid' ? (

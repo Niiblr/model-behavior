@@ -118,7 +118,7 @@ function HybridView({ message, loadingPhase }) {
   return (
     <div className="hybrid-view">
       <div className="hybrid-header">
-        <span className="hybrid-badge">🔀 Hybrid Mode</span>
+        <span className="hybrid-badge">🔀 Debate Mode</span>
         <span className="hybrid-header-sub">Socratic → Debate → Devil's Advocate → Synthesis</span>
       </div>
 

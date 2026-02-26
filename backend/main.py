@@ -44,7 +44,7 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
-    mode: str = "council"  # "council" = original 3-stage, "hybrid" = new 4-phase hybrid
+    mode: str = "council"  # "council" = original 3-stage, "hybrid" = new 4-phase debate
 
 
 class RenameConversationRequest(BaseModel):
@@ -197,7 +197,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 @app.post("/api/conversations/{conversation_id}/message/stream/hybrid")
 async def send_message_stream_hybrid(conversation_id: str, request: SendMessageRequest):
     """
-    Send a message and stream the 4-phase hybrid council process.
+    Send a message and stream the 4-phase debate council process.
     Phase 1: Socratic | Phase 2: Debate | Phase 3: Devil's Advocate | Phase 4: Synthesis
     """
     conversation = storage.get_conversation(conversation_id)
@@ -319,7 +319,7 @@ async def export_conversation(conversation_id: str):
             markdown += f"## User\n\n{message['content']}\n\n"
         elif message["role"] == "assistant":
             if message.get("mode") == "hybrid":
-                markdown += "## Hybrid Council Response\n\n"
+                markdown += "## Debate Mode Council Response\n\n"
 
                 markdown += "### Phase 1: Socratic (Initial Responses)\n\n"
                 for response in message.get("hybrid_phase1", []):
@@ -629,7 +629,7 @@ async def export_conversation_html(conversation_id: str):
           {{ label: '✨ Phase 4: Final Synthesis', single: section.hybrid_phase4, multi: false }},
         ];
 
-        let html = '<div class="hybrid-header">🔀 Hybrid Council — Socratic → Debate → Devils Advocate → Synthesis</div>';
+        let html = '<div class="hybrid-header">🔀 Debate Mode — Socratic → Debate → Devils Advocate → Synthesis</div>';
         phases.forEach(phase => {{
           html += `<div class="stage-block"><div class="stage-heading">${{phase.label}}</div>`;
           if (phase.multi && phase.items && phase.items.length > 0) {{
