@@ -28,7 +28,7 @@ You can run the **original Council mode** — [Karpathy's](https://github.com/ka
 | Feature | karpathy/llm-council | Model Behavior |
 |---|---|---|
 | Council mode (3-stage) | ✅ Original | ✅ Preserved with minor UI changes |
-| **Hybrid mode (4-phase)** | ❌ | ✅ Socratic → Debate → Devil's Advocate → Synthesis |
+| Hybrid mode (4-phase) | ❌ | ✅ Socratic → Debate → Devil's Advocate → Synthesis |
 | Anonymous peer review | ✅ Model identities hidden during ranking | ✅ Preserved from original |
 | Response delivery | Wait for all responses | Streaming — results appear phase by phase |
 | UI | ✅ | ✅ Improved UI for readability and clarity |
@@ -49,7 +49,7 @@ The classic Karpathy 3-stage process:
 2. **Stage 2** — Models review and rank each other's answers anonymously
 3. **Stage 3** — Chairman synthesizes the final answer
 
-### 🔀 **Hybrid Mode (new)**
+### 🔀 Hybrid Mode (new)
 A more conversational 4-phase process inspired by how humans actually debate:
 1. **Phase 1 (Socratic)** — All models form their initial understanding
 2. **Phase 2 (Debate)** — Each model reads the others' answers and agrees, disagrees, or adds nuance
@@ -227,7 +227,12 @@ Ollama also hosts models on their own servers, which you access over the interne
 OLLAMA_CLOUD_API_KEY=...
 ```
 
-**Add a cloud model to your council** in `backend/config.py`:
+**Pull the model** in PowerShell using the `:cloud` tag:
+```
+ollama pull llama3:70b:cloud
+```
+
+**Then add it to your council** in `backend/config.py`:
 ```python
 {
     "provider": ollama_cloud,
