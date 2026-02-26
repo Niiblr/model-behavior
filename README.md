@@ -5,9 +5,7 @@
 
 > *Multiple AIs walk into a room.*
 
-This is an expanded version based on [Andrej Karpathy's llm-council](https://github.com/karpathy/llm-council). It builds on the original concept of sending a question to multiple LLMs, having them rank each other, and synthesizing an answer.
-
-The current version introduces a four-phase process modeled on human debate. It also adds new modes, additional providers, streaming, data exports, and a conversational interface.
+Most AI tools give you one model, one answer. Model Behavior takes a different approach: it assembles a council of multiple LLMs and puts them through a structured debate. You can run the **original Council mode** — [Karpathy's](https://github.com/karpathy/llm-council) classic 3-stage process of independent answers, peer ranking, and synthesis or the **New Hybrid mode**, which adds a full debate phase and a dedicated devil's advocate that challenges whatever consensus is emerging before the chairman delivers the final result. The goal is a more pressure-tested answer than any single model could produce on its own.
 
 ---
 
