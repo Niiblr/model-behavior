@@ -6,7 +6,7 @@
 > *Multiple AIs walk into a room.*
 
 Most AI tools give you one model, one answer. Model Behavior takes a different approach: it assembles a council of multiple LLMs and puts them through a structured debate. 
-You can run the **original Council mode** — [Karpathy's](https://github.com/karpathy/llm-council) classic 3-stage process of independent answers, peer ranking, and synthesis or tou can run the **New Hybrid mode**, which adds a full debate phase and a dedicated devil's advocate that challenges whatever consensus is emerging before the chairman delivers the final result. The goal is a more pressure-tested answer than any single model could produce on its own.
+You can run the **original Council mode** — [Karpathy's](https://github.com/karpathy/llm-council) classic 3-stage process of independent answers, peer ranking, and synthesis or you can run the **New Hybrid mode**, which adds a full debate phase and a dedicated devil's advocate that challenges whatever consensus is emerging before the chairman delivers the final result. The goal is a more pressure-tested answer than any single model could produce on its own.
 
 ---
 
