@@ -46,7 +46,7 @@ You can run the **original Council mode** — [Karpathy's](https://github.com/ka
 ### 🏛️ Council Mode (original)
 The classic Karpathy 3-stage process:
 1. **Stage 1** — All models answer independently
-2. **Stage 2** — Models review and rank each other's answers anonymously
+2. **Stage 2** — Models review and rank each others' answers anonymously
 3. **Stage 3** — Chairman synthesizes the final answer
 
 ### 🔀 Hybrid Mode (new)
