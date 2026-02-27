@@ -60,11 +60,11 @@ COUNCIL_MODELS = [
         "model": "gpt-oss:120b-cloud",
         "name": "GPT-OSS 120B"
     },
-    {
-        "provider": ollama,
-        "model": "minimax-m2.5:cloud",
-        "name": "Minimax M2.5"
-    },
+#    {
+#        "provider": ollama,
+#        "model": "minimax-m2.5:cloud",
+#        "name": "Minimax M2.5"
+#    },
     {
         "provider": ollama,
         "model": "qwen3-next:80b-cloud",
@@ -74,13 +74,13 @@ COUNCIL_MODELS = [
     # --- OpenRouter (free tier) ---
     {
         "provider": openrouter,
-        "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-        "name": "Dolphin Mistral 24B"
+        "model": "arcee-ai/trinity-large-preview:free",
+        "name": "Arcee AI"
     },
     {
         "provider": openrouter,
-        "model": "meta-llama/llama-3.3-70b-instruct:free",
-        "name": "Llama 3.3 70B"
+        "model": "upstage/solar-pro-3:free",
+        "name": "Solar Pro 3"
     },
     {
         "provider": openrouter,
