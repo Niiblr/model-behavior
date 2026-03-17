@@ -78,15 +78,15 @@ COUNCIL_MODELS = [
         "name": "Arcee AI"
     },
     {
-        "provider": openrouter,
-        "model": "upstage/solar-pro-3:free",
-        "name": "Solar Pro 3"
+        "provider": ollama,
+        "model": "ministral-3:14b-cloud",
+        "name": "Ministral 3"
     },
-    {
-        "provider": openrouter,
-        "model": "nousresearch/hermes-3-llama-3.1-405b:free",
-        "name": "Hermes 3 405B"
-    },
+#    {
+#        "provider": openrouter,
+#        "model": "nousresearch/hermes-3-llama-3.1-405b:free",
+#        "name": "Hermes 3 405B"
+#    },
 ]
 
 # Filter out any models whose provider wasn't initialized (missing API key)

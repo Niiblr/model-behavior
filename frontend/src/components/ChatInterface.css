@@ -7,7 +7,7 @@
 }
 
 /* Header */
-.chat-interface > div:first-child {
+.chat-interface>div:first-child {
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -107,29 +107,8 @@
   flex-shrink: 0;
 }
 
-.input-form textarea {
-  flex: 1;
-  padding: 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: 15px;
-  resize: vertical;
-  min-height: 80px;
-  background: #ffffff;
-  color: #1e293b;
-  transition: all 0.2s ease;
-}
 
-.input-form textarea:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
 
-.input-form textarea::placeholder {
-  color: #94a3b8;
-}
 
 .input-form button {
   padding: 16px 32px;
@@ -168,8 +147,13 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .loading-spinner {
@@ -182,8 +166,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-text {
@@ -214,6 +203,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -281,4 +271,176 @@
   padding: 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+}
+
+/* ---- File Upload ---- */
+
+/* Wrapper that groups textarea + attach button vertically */
+.input-with-attach {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.textarea-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.textarea-row textarea {
+  flex: 1;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  resize: vertical;
+  min-height: 80px;
+  background: #ffffff;
+  color: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.textarea-row textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.textarea-row textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Paperclip button */
+.file-attach-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px !important;
+  border: 2px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.file-attach-btn:hover:not(:disabled) {
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+  background: #eff6ff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1) !important;
+}
+
+.file-attach-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.file-attach-btn.has-file {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+  color: #2563eb !important;
+}
+
+/* Attached file chip */
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #93c5fd;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e40af;
+  width: fit-content;
+}
+
+.file-chip .chip-icon {
+  font-size: 14px;
+}
+
+.file-chip .chip-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chip .chip-remove {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #3b82f6;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.file-chip .chip-remove:hover {
+  background: #bfdbfe;
+  color: #1e40af;
+}
+
+/* Upload loading state chip */
+.file-uploading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.file-uploading .mini-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #cbd5e1;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* File badge inside user message bubbles */
+.file-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  margin-bottom: 8px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e40af;
+  letter-spacing: 0.02em;
+}
+
+/* Upload error text */
+.upload-error {
+  font-size: 12px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 5px 10px;
 }

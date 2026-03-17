@@ -40,6 +40,8 @@ The goal is a more pressure-tested answer than any single model could produce on
 | Anonymous peer review | ✅ Model identities hidden during ranking | ✅ Preserved from original |
 | Response delivery | Wait for all responses | Streaming — results appear phase by phase |
 | UI | ✅ | ✅ Improved UI for readability and clarity |
+| Model connectivity test | ❌ | ✅ 📡 "Test Models" button pings all LLMs and shows live status & latency |
+| File upload | ❌ | ✅ 📎 Attach pdf, docx, txt, sh, py, md, xls, xlsx — full text sent to the council |
 
 ### 💾 Export & Data
 
@@ -65,6 +67,32 @@ A more conversational 4-phase process inspired by how humans actually debate:
 4. **Phase 4 (Synthesis)** — The Chairman delivers a final answer informed by the full debate
 
 → [See the UI in action](ui-preview.png)
+
+---
+
+## 📎 File Upload
+
+You can attach a file to any query and ask the council to analyze, summarize, review, or discuss its contents.
+
+**How to use:**
+1. Open or create a conversation and choose your mode (Council or Debate)
+2. Click the **📎** button to the left of the text input
+3. Pick a file — supported formats: `pdf`, `docx`, `txt`, `sh`, `py`, `md`, `xls`, `xlsx` (max 20 MB)
+4. A file chip appears below the input showing the filename. You can click ✕ to remove it.
+5. Optionally type a question alongside the file (e.g. *"summarize this"*, *"what are the risks here?"*). You can also send without any text — the council will analyze the file directly.
+6. Click **Send to Council** — the file's text is extracted on the backend and prepended to your message so every model and the Chairman receive the full document as context.
+
+**Supported file types:**
+
+| Extension | What gets extracted |
+|-----------|---------------------|
+| `pdf` | All page text via `pypdf` |
+| `docx` | All paragraph text via `python-docx` |
+| `xlsx` | Cell values from all sheets via `openpyxl` |
+| `xls` | Cell values from all sheets via `xlrd` |
+| `txt`, `sh`, `py`, `md` | Raw UTF-8 text |
+
+> File content is never stored — it is extracted, prepended to the message, and discarded. The conversation history stores only the final assembled message text.
 
 ---
 

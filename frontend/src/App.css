@@ -40,6 +40,25 @@
   transform: translateY(0);
 }
 
+.ping-test-btn {
+  margin: 0 20px 20px;
+  padding: 10px 16px;
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ping-test-btn:hover {
+  background: #f1f5f9;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+
 /* Main Area - Full Width */
 .main {
   flex: 1;

@@ -27,7 +27,8 @@ class OllamaProvider(Provider):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Query a model via Ollama API."""
         headers = {
@@ -43,6 +44,8 @@ class OllamaProvider(Provider):
             "messages": messages,
             "stream": False  # We want the complete response
         }
+        if max_tokens is not None:
+            payload["options"] = {"num_predict": max_tokens}
         
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:

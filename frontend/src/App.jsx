@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface';
 import ConversationList from './components/ConversationList';
+import PingModal from './components/PingModal';
 import './App.css';
 
 function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
+  const [showPingModal, setShowPingModal] = useState(false);
 
   // Load conversations list on mount
   useEffect(() => {
@@ -148,7 +150,7 @@ function App() {
                 return { ...prev, messages: updatedMessages };
               });
 
-            // --- Hybrid mode events ---
+              // --- Hybrid mode events ---
             } else if (data.type === 'hybrid_phase1_complete') {
               assistantMessage.hybrid_phase1 = data.data;
               setCurrentConversation(prev => {
@@ -178,7 +180,7 @@ function App() {
                 return { ...prev, messages: updatedMessages };
               });
 
-            // --- Shared events ---
+              // --- Shared events ---
             } else if (data.type === 'title_complete') {
               setCurrentConversation(prev => ({
                 ...prev,
@@ -223,6 +225,12 @@ function App() {
         >
           + New Conversation
         </button>
+        <button
+          className="ping-test-btn"
+          onClick={() => setShowPingModal(true)}
+        >
+          📡 Test Models
+        </button>
         <ConversationList
           conversations={conversations}
           currentId={currentConversationId}
@@ -242,10 +250,13 @@ function App() {
           <div className="welcome">
             <h1>Model Behavior</h1>
             <p>Create a new conversation or select one from the sidebar to begin.</p>
-<p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "24px" }}>by Niiblr · based on <a href="https://github.com/karpathy/llm-council" target="_blank" style={{ color: "#9ca3af" }}>karpathy/llm-council</a></p>
+            <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "24px" }}>by Niiblr · based on <a href="https://github.com/karpathy/llm-council" target="_blank" style={{ color: "#9ca3af" }}>karpathy/llm-council</a></p>
           </div>
         )}
       </div>
+      {showPingModal && (
+        <PingModal onClose={() => setShowPingModal(false)} />
+      )}
     </div>
   );
 }

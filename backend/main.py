@@ -1,6 +1,6 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -72,6 +72,168 @@ class Conversation(BaseModel):
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/ping")
+async def ping_models():
+    """
+    Ping all configured LLM models with a minimal prompt.
+    Returns Server-Sent Events as each model responds.
+    """
+    import time as _time
+    from .config import COUNCIL_MODELS, CHAIRMAN_CONFIG, DEVILS_ADVOCATE_CONFIG
+    from .providers import query_model
+
+    # Build deduplicated list of all models to test
+    seen = set()
+    models_to_test = []
+    for config in COUNCIL_MODELS:
+        key = (id(config["provider"]), config["model"])
+        if key not in seen:
+            seen.add(key)
+            models_to_test.append(config)
+    for extra in [CHAIRMAN_CONFIG, DEVILS_ADVOCATE_CONFIG]:
+        key = (id(extra["provider"]), extra["model"])
+        if key not in seen:
+            seen.add(key)
+            models_to_test.append(extra)
+
+    total = len(models_to_test)
+    ping_message = [{"role": "user", "content": "Reply with only the word: pong"}]
+
+    async def ping_one(config):
+        name = config["name"]
+        start = _time.perf_counter()
+        try:
+            response = await query_model(
+                config["provider"],
+                config["model"],
+                ping_message,
+                timeout=120.0
+            )
+            elapsed = round((_time.perf_counter() - start) * 1000)
+            if response and response.get("content"):
+                return {"model": name, "status": "ok", "latency_ms": elapsed, "response": response["content"].strip()[:50]}
+            else:
+                return {"model": name, "status": "error", "latency_ms": elapsed, "error": "No response"}
+        except Exception as e:
+            elapsed = round((_time.perf_counter() - start) * 1000)
+            return {"model": name, "status": "error", "latency_ms": elapsed, "error": str(e)[:100]}
+
+    async def event_generator():
+        # Send initial event with model count
+        yield f"data: {json.dumps({'type': 'ping_start', 'total': total, 'models': [c['name'] for c in models_to_test]})}\n\n"
+
+        # Fire all pings concurrently, yield as each completes
+        tasks = {asyncio.create_task(ping_one(c)): c["name"] for c in models_to_test}
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            yield f"data: {json.dumps({'type': 'ping_result', 'data': result})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'ping_complete'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+def _extract_text_from_file(ext: str, data: bytes, filename: str) -> str:
+    """Extract plain text from an uploaded file based on its extension."""
+    import io
+
+    if ext in {"txt", "sh", "py", "md"}:
+        return data.decode("utf-8", errors="replace")
+
+    elif ext == "pdf":
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(data))
+            pages = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    pages.append(text)
+            return "\n\n".join(pages) if pages else "(No text could be extracted from this PDF)"
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not parse PDF: {e}")
+
+    elif ext == "docx":
+        try:
+            import docx
+            doc = docx.Document(io.BytesIO(data))
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            return "\n\n".join(paragraphs) if paragraphs else "(No text could be extracted from this DOCX)"
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not parse DOCX: {e}")
+
+    elif ext == "xlsx":
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+            rows = []
+            for sheet in wb.worksheets:
+                rows.append(f"[Sheet: {sheet.title}]")
+                for row in sheet.iter_rows(values_only=True):
+                    row_str = "\t".join(str(c) if c is not None else "" for c in row)
+                    if row_str.strip():
+                        rows.append(row_str)
+            return "\n".join(rows) if rows else "(No data found in XLSX)"
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not parse XLSX: {e}")
+
+    elif ext == "xls":
+        try:
+            import xlrd
+            wb = xlrd.open_workbook(file_contents=data)
+            rows = []
+            for sheet in wb.sheets():
+                rows.append(f"[Sheet: {sheet.name}]")
+                for rx in range(sheet.nrows):
+                    row_str = "\t".join(str(sheet.cell_value(rx, cx)) for cx in range(sheet.ncols))
+                    if row_str.strip():
+                        rows.append(row_str)
+            return "\n".join(rows) if rows else "(No data found in XLS)"
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not parse XLS: {e}")
+
+    raise HTTPException(status_code=400, detail=f"Unsupported file type: .{ext}")
+
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Upload a file and extract its text content.
+    Supports: pdf, docx, txt, sh, py, md, xls, xlsx
+    Returns: { "text": str, "filename": str, "size": int }
+    """
+    ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "sh", "py", "md", "xls", "xlsx"}
+    MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+
+    filename = file.filename or "upload"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '.{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        )
+
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 20 MB.")
+
+    text = _extract_text_from_file(ext, data, filename)
+
+    return {
+        "text": text,
+        "filename": filename,
+        "size": len(data)
+    }
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
@@ -316,7 +478,19 @@ async def export_conversation(conversation_id: str):
 
     for message in conversation["messages"]:
         if message["role"] == "user":
-            markdown += f"## User\n\n{message['content']}\n\n"
+            # Parse optional file attachment from prepended block
+            content = message["content"]
+            import re as _re
+            file_match = _re.match(r"^\[File: (.+?)\]", content)
+            file_name = file_match.group(1) if file_match else None
+            question_match = _re.search(r"\nUser question: ([\s\S]*)$", content)
+            display_text = question_match.group(1) if question_match else content
+
+            markdown += "## User\n\n"
+            if file_name:
+                markdown += f"📄 **Attached file:** `{file_name}`\n\n"
+            markdown += f"{display_text}\n\n"
+
         elif message["role"] == "assistant":
             if message.get("mode") == "hybrid":
                 markdown += "## Debate Mode Council Response\n\n"
@@ -408,7 +582,7 @@ async def export_conversation_html(conversation_id: str):
     title_escaped = conversation["title"].replace('&', '&amp;').replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;').replace("'", '&#39;')
     created_at = conversation["created_at"]
 
-    html = f"""<!DOCTYPE html>
+    html_before = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -456,6 +630,19 @@ async def export_conversation_html(conversation_id: str):
       margin-bottom: 8px;
     }}
     .user-text {{ color: #1e293b; line-height: 1.7; white-space: pre-wrap; }}
+    .file-badge-export {{
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      margin-bottom: 8px;
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(37,99,235,0.25);
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1e40af;
+    }}
     .assistant-message {{
       background: #fff;
       border: 1px solid #e2e8f0;
@@ -576,130 +763,145 @@ async def export_conversation_html(conversation_id: str):
   <div class="container" id="root"></div>
 
   <script>
-    const sections = {sections_json};
+    const sections = """
 
-    function md(text) {{
+    html_after = """;
+
+    function md(text) {
       return marked.parse(text || '');
-    }}
+    }
 
-    function shortModel(m) {{
+    function shortModel(m) {
       return (m || '').split('/')[1] || m;
-    }}
+    }
 
     let tabCounters = 0;
 
-    function buildTabs(items, labelFn, contentFn) {{
+    function buildTabs(items, labelFn, contentFn) {
       const groupId = 'tg' + (tabCounters++);
       const tabsHtml = items.map((item, i) =>
-        `<button class="tab-btn ${{i===0?'active':''}}" onclick="selectTab('${{groupId}}',${{i}},this)">${{labelFn(item, i)}}</button>`
+        `<button class="tab-btn ${i===0?'active':''}" onclick="selectTab('${groupId}',${i},this)">${labelFn(item, i)}</button>`
       ).join('');
       const panelsHtml = items.map((item, i) =>
-        `<div class="tab-panel ${{i===0?'visible':''}}" id="${{groupId}}-panel-${{i}}">${{contentFn(item, i)}}</div>`
+        `<div class="tab-panel ${i===0?'visible':''}" id="${groupId}-panel-${i}">${contentFn(item, i)}</div>`
       ).join('');
-      return `<div class="tabs">${{tabsHtml}}</div>${{panelsHtml}}`;
-    }}
+      return `<div class="tabs">${tabsHtml}</div>${panelsHtml}`;
+    }
 
-    function selectTab(groupId, idx, btn) {{
+    function selectTab(groupId, idx, btn) {
       const group = btn.closest('.stage-block, .assistant-message');
-      group.querySelectorAll(`[id^="${{groupId}}-panel-"]`).forEach((p,i) => {{
+      group.querySelectorAll(`[id^="${groupId}-panel-"]`).forEach((p,i) => {
         p.classList.toggle('visible', i===idx);
-      }});
-      btn.parentElement.querySelectorAll('.tab-btn').forEach((b,i) => {{
+      });
+      btn.parentElement.querySelectorAll('.tab-btn').forEach((b,i) => {
         b.classList.toggle('active', i===idx);
-      }});
-    }}
+      });
+    }
 
     const root = document.getElementById('root');
 
-    sections.forEach((section, si) => {{
+    sections.forEach((section, si) => {
       const div = document.createElement('div');
       div.className = 'message';
 
-      if (section.type === 'user') {{
+      if (section.type === 'user') {
         div.className += ' user-message';
-        div.innerHTML = `<div class="user-label">You</div><div class="user-text">${{escHtml(section.content)}}</div>`;
+        // Parse optional file badge from content starting with [File: ...]
+        const fileMatch = section.content.match(/^\\[File: (.+?)\\]/);
+        const fileName = fileMatch ? fileMatch[1] : null;
+        // Strip file block, show only the user question
+        let displayText = section.content;
+        const questionMatch = section.content.match(/\\nUser question: ([\\s\\S]*)$/);
+        if (questionMatch) displayText = questionMatch[1];
 
-      }} else if (section.type === 'hybrid') {{
+        const badgeHtml = fileName
+          ? `<div class="file-badge-export">&#128196; ${escHtml(fileName)}</div>`
+          : '';
+        div.innerHTML = `<div class="user-label">You</div>${badgeHtml}<div class="user-text">${escHtml(displayText)}</div>`;
+
+      } else if (section.type === 'hybrid') {
         div.className += ' assistant-message';
 
         const phases = [
-          {{ label: '💬 Phase 1: Socratic', items: section.hybrid_phase1, multi: true }},
-          {{ label: '⚔️ Phase 2: Debate', items: section.hybrid_phase2, multi: true }},
-          {{ label: "😈 Phase 3: Devils Advocate", single: section.hybrid_phase3, multi: false }},
-          {{ label: '✨ Phase 4: Final Synthesis', single: section.hybrid_phase4, multi: false }},
+          { label: '&#x1F4AC; Phase 1: Socratic', items: section.hybrid_phase1, multi: true },
+          { label: '&#x2694;&#xFE0F; Phase 2: Debate', items: section.hybrid_phase2, multi: true },
+          { label: "&#x1F608; Phase 3: Devils Advocate", single: section.hybrid_phase3, multi: false },
+          { label: '&#x2728; Phase 4: Final Synthesis', single: section.hybrid_phase4, multi: false },
         ];
 
-        let html = '<div class="hybrid-header">🔀 Debate Mode — Socratic → Debate → Devils Advocate → Synthesis</div>';
-        phases.forEach(phase => {{
-          html += `<div class="stage-block"><div class="stage-heading">${{phase.label}}</div>`;
-          if (phase.multi && phase.items && phase.items.length > 0) {{
+        let html = '<div class="hybrid-header">&#x1F500; Debate Mode &#x2014; Socratic &#x2192; Debate &#x2192; Devils Advocate &#x2192; Synthesis</div>';
+        phases.forEach(phase => {
+          html += `<div class="stage-block"><div class="stage-heading">${phase.label}</div>`;
+          if (phase.multi && phase.items && phase.items.length > 0) {
             html += buildTabs(
               phase.items,
               r => escHtml(r.model),
-              r => `<div class="model-label">${{escHtml(r.model)}}</div><div class="md-content">${{md(r.response)}}</div>`
+              r => `<div class="model-label">${escHtml(r.model)}</div><div class="md-content">${md(r.response)}</div>`
             );
-          }} else if (!phase.multi && phase.single && phase.single.response) {{
-            html += `<div class="model-label">${{escHtml(phase.single.model||'')}}</div><div class="md-content">${{md(phase.single.response)}}</div>`;
-          }}
+          } else if (!phase.multi && phase.single && phase.single.response) {
+            html += `<div class="model-label">${escHtml(phase.single.model||'')}</div><div class="md-content">${md(phase.single.response)}</div>`;
+          }
           html += '</div>';
-        }});
+        });
         div.innerHTML = html;
 
-      }} else {{
+      } else {
         div.className += ' assistant-message';
 
         let s1Html = '';
-        if (section.stage1 && section.stage1.length > 0) {{
+        if (section.stage1 && section.stage1.length > 0) {
           s1Html = buildTabs(
             section.stage1,
             (r) => shortModel(r.model),
-            (r) => `<div class="model-label">${{escHtml(r.model)}}</div><div class="md-content">${{md(r.response)}}</div>`
+            (r) => `<div class="model-label">${escHtml(r.model)}</div><div class="md-content">${md(r.response)}</div>`
           );
-        }}
+        }
 
         let s2Html = '';
-        if (section.stage2 && section.stage2.length > 0) {{
+        if (section.stage2 && section.stage2.length > 0) {
           s2Html = buildTabs(
             section.stage2,
             (r) => shortModel(r.model),
-            (r) => `<div class="model-label">${{escHtml(r.model)}}</div><div class="md-content">${{md(r.ranking)}}</div>`
+            (r) => `<div class="model-label">${escHtml(r.model)}</div><div class="md-content">${md(r.ranking)}</div>`
           );
-        }}
+        }
 
-        const s3 = section.stage3 || {{}};
+        const s3 = section.stage3 || {};
         const s3Html = s3.response
-          ? `<div class="model-label">${{escHtml(s3.model||'')}}</div><div class="md-content">${{md(s3.response)}}</div>`
+          ? `<div class="model-label">${escHtml(s3.model||'')}</div><div class="md-content">${md(s3.response)}</div>`
           : '<em>Not available</em>';
 
         div.innerHTML = `
           <div class="stage-block">
             <div class="stage-heading">Stage 1: Individual Responses</div>
-            ${{s1Html}}
+            ${s1Html}
           </div>
           <div class="stage-block">
             <div class="stage-heading">Stage 2: Peer Rankings</div>
-            ${{s2Html}}
+            ${s2Html}
           </div>
           <div class="stage-block stage3-block">
             <div class="stage-heading">Stage 3: Final Synthesis</div>
-            ${{s3Html}}
+            ${s3Html}
           </div>
         `;
-      }}
+      }
 
       root.appendChild(div);
-    }});
+    });
 
-    function escHtml(str) {{
+    function escHtml(str) {
       return String(str)
         .replace(/&/g,'&amp;')
         .replace(/</g,'&lt;')
         .replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;');
-    }}
+    }
   </script>
 </body>
 </html>"""
+
+    html = html_before + sections_json + html_after
 
     safe_title = conversation["title"].replace(" ", "_").replace("/", "-")
     return {

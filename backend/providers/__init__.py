@@ -13,7 +13,8 @@ class Provider:
         self,
         model: str,
         messages: List[Dict[str, str]],
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         raise NotImplementedError
 
@@ -22,23 +23,25 @@ async def query_model(
     provider: Provider,
     model: str,
     messages: List[Dict[str, str]],
-    timeout: float = 120.0
+    timeout: float = 120.0,
+    max_tokens: Optional[int] = None
 ) -> Optional[Dict[str, Any]]:
     """Query a single model through its provider."""
-    return await provider.query(model, messages, timeout)
+    return await provider.query(model, messages, timeout, max_tokens)
 
 
-async def _staggered_query(provider, model, name, messages, delay):
+async def _staggered_query(provider, model, name, messages, delay, max_tokens=None):
     """Wait for delay seconds then query the model."""
     if delay > 0:
         await asyncio.sleep(delay)
-    response = await query_model(provider, model, messages, timeout=300.0)
+    response = await query_model(provider, model, messages, timeout=300.0, max_tokens=max_tokens)
     return name, response
 
 
 async def query_models_parallel(
     model_configs: List[Dict[str, Any]],
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, str]],
+    max_tokens: Optional[int] = None
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
     Query multiple models, firing non-OpenRouter models in parallel immediately
@@ -60,7 +63,7 @@ async def query_models_parallel(
         else:
             delay = 0
 
-        tasks.append(_staggered_query(provider, model, name, messages, delay))
+        tasks.append(_staggered_query(provider, model, name, messages, delay, max_tokens))
 
     results = await asyncio.gather(*tasks)
 

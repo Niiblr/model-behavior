@@ -20,7 +20,8 @@ class OpenRouterProvider(Provider):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Query a model via OpenRouter API with exponential backoff on rate limits."""
         headers = {
@@ -31,6 +32,8 @@ class OpenRouterProvider(Provider):
             "model": model,
             "messages": messages,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         for attempt in range(MAX_RETRIES):
             try:

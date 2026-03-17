@@ -22,7 +22,8 @@ class GeminiProvider(Provider):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        timeout: float = 120.0
+        timeout: float = 120.0,
+        max_tokens: Optional[int] = None
     ) -> Optional[Dict[str, Any]]:
         """Query a model via Gemini API."""
         
@@ -42,7 +43,7 @@ class GeminiProvider(Provider):
             "contents": contents,
             "generationConfig": {
                 "temperature": 1.0,
-                "maxOutputTokens": 8192,
+                "maxOutputTokens": max_tokens if max_tokens is not None else 8192,
             }
         }
         
@@ -56,8 +57,17 @@ class GeminiProvider(Provider):
                 
                 data = response.json()
                 
-                # Extract content from Gemini response format
-                content = data['candidates'][0]['content']['parts'][0]['text']
+                # Safely extract content from Gemini response format
+                candidates = data.get('candidates', [])
+                if not candidates:
+                    print(f"Gemini model {model}: no candidates in response: {data}")
+                    return None
+                content_obj = candidates[0].get('content', {})
+                parts = content_obj.get('parts', [])
+                if not parts:
+                    print(f"Gemini model {model}: no parts in response: {data}")
+                    return None
+                content = parts[0].get('text', '')
                 
                 return {
                     'content': content,

@@ -6,6 +6,9 @@ import Stage3 from './Stage3';
 import HybridView from './HybridView';
 import './ChatInterface.css';
 
+const ACCEPTED_TYPES = '.pdf,.docx,.txt,.sh,.py,.md,.xls,.xlsx';
+const API_BASE = 'http://localhost:8001';
+
 function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle, onDelete }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -15,7 +18,14 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [tooltip, setTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
+
+  // File upload state
+  const [attachedFile, setAttachedFile] = useState(null);   // { name, text }
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const modeTooltips = {
     council: '🏛️ Council Mode\n\nA structured 3-stage process:\n• Stage 1: Each AI model independently forms its own answer\n• Stage 2: Models evaluate and rank each other\'s responses\n• Stage 3: A Chairman AI synthesizes the best final answer',
@@ -65,9 +75,63 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
     }
   }, [messages]);
 
+  // ---- File upload ----
+
+  const handleFileButtonClick = () => {
+    if (isLoading || isUploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be re-selected if needed
+    e.target.value = '';
+
+    setUploadError('');
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: 'Upload failed' }));
+        throw new Error(err.detail || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setAttachedFile({ name: data.filename, text: data.text });
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setAttachedFile(null);
+    setUploadError('');
+  };
+
+  // ---- Submit ----
+
+  const buildMessageWithFile = (userText, file) => {
+    if (!file) return userText;
+    return `[File: ${file.name}]\n\`\`\`\n${file.text}\n\`\`\`\n\nUser question: ${userText}`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !attachedFile) || isLoading || isUploading) return;
+
+    const finalContent = buildMessageWithFile(input, attachedFile);
 
     setIsLoading(true);
     if (mode === 'hybrid') {
@@ -75,7 +139,12 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
     } else {
       setLoadingStage('stage1');
     }
-    await onSendMessage(input, mode);
+
+    const fileNameForDisplay = attachedFile ? attachedFile.name : null;
+    setAttachedFile(null);
+    setUploadError('');
+
+    await onSendMessage(finalContent, mode, fileNameForDisplay);
     setInput('');
     setIsLoading(false);
     setLoadingStage('');
@@ -108,7 +177,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   const handleClearMessages = async () => {
     if (!window.confirm('Are you sure you want to clear all messages? This cannot be undone.')) return;
     try {
-      const response = await fetch(`http://localhost:8001/api/conversations/${conversationId}/messages`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE}/api/conversations/${conversationId}/messages`, { method: 'DELETE' });
       if (response.ok) window.location.reload();
     } catch (error) {
       console.error('Error clearing messages:', error);
@@ -119,7 +188,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   const handleRename = async () => {
     if (!newTitle.trim()) return;
     try {
-      const response = await fetch(`http://localhost:8001/api/conversations/${conversationId}/title`, {
+      const response = await fetch(`${API_BASE}/api/conversations/${conversationId}/title`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle }),
@@ -138,7 +207,7 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   const handleDeleteConversation = async () => {
     if (!window.confirm('Are you sure you want to delete this entire conversation? This cannot be undone.')) return;
     try {
-      const response = await fetch(`http://localhost:8001/api/conversations/${conversationId}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, { method: 'DELETE' });
       if (response.ok) onDelete();
     } catch (error) {
       console.error('Error deleting conversation:', error);
@@ -149,8 +218,8 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
   const handleExport = async (format = 'markdown') => {
     try {
       const url = format === 'html'
-        ? `http://localhost:8001/api/conversations/${conversationId}/export/html`
-        : `http://localhost:8001/api/conversations/${conversationId}/export`;
+        ? `${API_BASE}/api/conversations/${conversationId}/export/html`
+        : `${API_BASE}/api/conversations/${conversationId}/export`;
       const response = await fetch(url);
       const data = await response.json();
       const content = format === 'html' ? data.html : data.markdown;
@@ -218,6 +287,24 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
       </div>
     );
   };
+
+  /** Extract the [File: …] name from a message content string, if present */
+  const parseFileBadge = (content) => {
+    if (!content) return null;
+    const match = content.match(/^\[File: (.+?)\]/);
+    return match ? match[1] : null;
+  };
+
+  /** Strip the prepended file block, returning just the user's question text */
+  const parseUserText = (content) => {
+    if (!content) return content;
+    // If there's a file block, extract just the question part
+    const questionMatch = content.match(/\nUser question: ([\s\S]*)$/);
+    if (questionMatch) return questionMatch[1];
+    return content;
+  };
+
+  const canSubmit = (input.trim() || attachedFile) && !isLoading && !isUploading;
 
   return (
     <div className="chat-interface">
@@ -364,16 +451,69 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
         )}
       </div>
 
+      {/* Input form */}
       <form onSubmit={handleSubmit} className="input-form input-form-top">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Select the mode and submit your question to the Council..."
-          disabled={isLoading}
-          rows={3}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_TYPES}
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
         />
-        <button type="submit" disabled={isLoading || !input.trim()}>
+
+        <div className="input-with-attach">
+          <div className="textarea-row">
+            {/* Paperclip button */}
+            <button
+              type="button"
+              className={`file-attach-btn${attachedFile ? ' has-file' : ''}`}
+              onClick={handleFileButtonClick}
+              disabled={isLoading || isUploading}
+              title="Attach a file (pdf, docx, txt, sh, py, md, xls, xlsx)"
+            >
+              📎
+            </button>
+
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={attachedFile
+                ? `File attached — add a question or just send to get council input on ${attachedFile.name}…`
+                : 'Select the mode and submit your question to the Council…'}
+              disabled={isLoading}
+              rows={3}
+            />
+          </div>
+
+          {/* File chip / uploading indicator / error */}
+          {isUploading && (
+            <div className="file-uploading">
+              <div className="mini-spinner" />
+              Extracting text…
+            </div>
+          )}
+          {!isUploading && attachedFile && (
+            <div className="file-chip">
+              <span className="chip-icon">📄</span>
+              <span className="chip-name" title={attachedFile.name}>{attachedFile.name}</span>
+              <button
+                type="button"
+                className="chip-remove"
+                onClick={handleRemoveFile}
+                title="Remove file"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {uploadError && (
+            <div className="upload-error">⚠️ {uploadError}</div>
+          )}
+        </div>
+
+        <button type="submit" disabled={!canSubmit}>
           {isLoading ? 'Thinking...' : 'Send to Council'}
         </button>
       </form>
@@ -391,7 +531,15 @@ function ChatInterface({ conversationId, messages, onSendMessage, onUpdateTitle,
             {message.role === 'user' ? (
               <div className="markdown-content">
                 <strong>You:</strong>
-                <p>{message.content}</p>
+                {/* File badge */}
+                {parseFileBadge(message.content) && (
+                  <div style={{ marginTop: '6px' }}>
+                    <span className="file-badge">
+                      📄 {parseFileBadge(message.content)}
+                    </span>
+                  </div>
+                )}
+                <p>{parseUserText(message.content)}</p>
               </div>
             ) : (
               <div className="assistant-message">

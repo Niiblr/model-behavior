@@ -18,7 +18,7 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     messages = [{"role": "user", "content": user_query}]
 
     # Query all models in parallel using the new provider system
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(COUNCIL_MODELS, messages, max_tokens=4096)
 
     # Format results
     stage1_results = []
@@ -26,7 +26,7 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
         if response is not None:  # Only include successful responses
             stage1_results.append({
                 "model": model_name,
-                "response": response.get('content', '')
+                "response": response.get('content', '').strip()
             })
 
     return stage1_results
@@ -81,10 +81,7 @@ IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
 
 Example of the correct format for your ENTIRE response:
 
-Response A provides good detail on X but misses Y...
-Response B is accurate but lacks depth on Z...
-Response C offers the most comprehensive answer...
-
+[your analysis here]
 FINAL RANKING:
 1. Response C
 2. Response A
@@ -95,13 +92,13 @@ Now provide your evaluation and ranking:"""
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(COUNCIL_MODELS, messages, max_tokens=1500)
 
     # Format results
     stage2_results = []
     for model_name, response in responses.items():
         if response is not None:
-            full_text = response.get('content', '')
+            full_text = response.get('content', '').strip()
             parsed = parse_ranking_from_text(full_text)
             stage2_results.append({
                 "model": model_name,
@@ -134,12 +131,12 @@ async def stage3_synthesize_final(
         for result in stage1_results
     ])
 
-    stage2_text = "\n\n".join([
-        f"Model: {result['model']}\nRanking: {result['ranking']}"
+    stage2_text = "\n".join([
+        f"{result['model']}: {', '.join(result['parsed_ranking'])}"
         for result in stage2_results
     ])
 
-    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
+    chairman_prompt = f"""You are the Chairman of an LLM Council. Synthesize the following models' responses and peer rankings into a definitive, final answer:
 
 Original Question: {user_query}
 
@@ -166,7 +163,8 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     response = await query_model(
         chairman_provider,
         chairman_model,
-        messages
+        messages,
+        max_tokens=4096
     )
 
     if response is None:
@@ -281,15 +279,23 @@ Title:"""
 
     messages = [{"role": "user", "content": title_prompt}]
 
-    # Use chairman for title generation
-    chairman_provider = CHAIRMAN_CONFIG["provider"]
-    chairman_model = CHAIRMAN_CONFIG["model"]
+    from .config import gemini, openrouter
+    if gemini:
+        title_provider = gemini
+        title_model = "gemini-flash-latest"
+    elif openrouter:
+        title_provider = openrouter
+        title_model = "google/gemini-flash-1.5-8b"
+    else:
+        title_provider = CHAIRMAN_CONFIG["provider"]
+        title_model = CHAIRMAN_CONFIG["model"]
     
     response = await query_model(
-        chairman_provider,
-        chairman_model,
+        title_provider,
+        title_model,
         messages,
-        timeout=30.0
+        timeout=30.0,
+        max_tokens=100
     )
 
     if response is None:
@@ -368,9 +374,9 @@ async def hybrid_phase1_socratic(user_query: str) -> List[Dict[str, Any]]:
     Kimi K2 is excluded here so it arrives fresh as Devil's Advocate in Phase 3.
     """
     messages = [{"role": "user", "content": user_query}]
-    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages, max_tokens=4096)
     return [
-        {"model": name, "response": r.get('content', '')}
+        {"model": name, "response": r.get('content', '').strip()}
         for name, r in responses.items()
         if r is not None
     ]
@@ -403,10 +409,10 @@ Now it is YOUR turn to engage in the debate. Read all the responses above carefu
 Be direct and intellectually honest. Do not simply summarize the others — engage with them critically. It is perfectly fine to strongly disagree. Reference specific models or points when you respond to them."""
 
     messages = [{"role": "user", "content": debate_prompt}]
-    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages)
+    responses = await query_models_parallel(HYBRID_COUNCIL_MODELS, messages, max_tokens=4096)
 
     return [
-        {"model": name, "response": r.get('content', '')}
+        {"model": name, "response": r.get('content', '').strip()}
         for name, r in responses.items()
         if r is not None
     ]
@@ -446,6 +452,7 @@ not to be agreeable. Even if you personally agree with the consensus, argue agai
     messages = [{"role": "user", "content": da_prompt}]
 
     # Use the dedicated Devil's Advocate model (separate from Chairman)
+    # No max_tokens cap — thinking models (e.g. Kimi K2) need uncapped budget
     response = await query_model(
         DEVILS_ADVOCATE_CONFIG["provider"],
         DEVILS_ADVOCATE_CONFIG["model"],
@@ -468,15 +475,11 @@ async def hybrid_phase4_synthesis(
     Hybrid Phase 4 (Chairman Synthesis): Having seen all phases — initial answers,
     debate, and devil's advocate challenge — the Chairman delivers the final answer.
     """
-    p1_text = _build_responses_text(phase1_results)
     p2_text = _build_responses_text(phase2_results)
 
     synthesis_prompt = f"""You are the Chairman of an AI Council. The council has completed a full hybrid debate process on a question. Your job is to deliver the final, definitive answer.
 
 Original Question: {user_query}
-
-PHASE 1 — Socratic (Initial Understanding):
-{p1_text}
 
 PHASE 2 — Debate (Agreements, Disagreements, Nuance):
 {p2_text}
@@ -494,6 +497,7 @@ This is the council's final word on the question."""
 
     messages = [{"role": "user", "content": synthesis_prompt}]
 
+    # No max_tokens cap — this is the final user-facing answer
     response = await query_model(
         CHAIRMAN_CONFIG["provider"],
         CHAIRMAN_CONFIG["model"],
