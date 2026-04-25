@@ -97,7 +97,7 @@ You only need keys for the providers you actually call. Ollama (local or cloud) 
 
 ### 3. Configure models
 
-Edit `backend/[config.py](http://config.py)`. Each council member needs `provider`, `model`, and `name`:
+Edit `backend/config.py`. Each council member needs `provider`, `model`, and `name`:
 
 ```python
 COUNCIL_MODELS = [
@@ -155,7 +155,7 @@ A council of a local Llama on your PC, a cloud Gemini via direct API, and a GPT 
    ollama pull mistral
    ollama pull gemma3
 ```
-3. Add it to your council in `backend/[config.py](http://config.py)`:
+3. Add it to your council in `backend/config.py`:
 ```python
    {
        "provider": ollama,
@@ -191,7 +191,7 @@ cd frontend
 npm run dev
 ```
 
-Or just run `./[start.sh](http://start.sh)` from the repo root, which starts both and traps Ctrl+C to stop both cleanly.
+Or just run `./start.sh` from the repo root, which starts both and traps Ctrl+C to stop both cleanly.
 
 Open <http://localhost:5173> in your browser.
 
