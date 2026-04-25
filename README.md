@@ -1,350 +1,233 @@
-# Model Behavior
+# Conclave
+
 ### by Niiblr
 
-![header](https://raw.githubusercontent.com/Niiblr/model-behavior/main/header.jpg)
+![header](https://raw.githubusercontent.com/Niiblr/conclave/main/header.jpg)
 
 > *Multiple AIs walk into a room.*
 
-Most AI tools give you one model, one answer. Model Behavior takes a different approach: it assembles a council of multiple LLMs and puts them through a structured deliberation process before giving you a response.
+A multi-LLM debate engine. Mix local Ollama, Gemini, OpenAI, and OpenRouter models in one council. Ask a question or upload a document, watch them debate it across multiple phases, get a synthesized answer.
 
-Every step is visible. You can read what each model said, see how they ranked or challenged each other, and follow the reasoning that led to the final answer. Nothing is hidden behind a single polished reply.
-
-Currently with two modes available (more to come):
-
-- **Council mode** runs a 3-stage process where models answer independently, rank each other's responses anonymously, then a Chairman synthesizes the best final answer.
-- **Debate mode** goes further, adding a live debate phase and a dedicated devil's advocate that challenges whatever consensus is forming before the Chairman delivers the final verdict.
-
-The goal is a more pressure-tested answer than any single model could produce on its own.
+Originally inspired by [Andrej Karpathy's llm-council](https://github.com/karpathy/llm-council), which sends a question to multiple LLMs, has them rank each other, and synthesizes an answer. Conclave keeps that core idea and builds on it: a four-phase debate mode, file upload, persistent conversations, streaming, and a fully self-contained HTML export.
 
 ---
 
 ## What's New vs the Original
 
-### 🔌 Providers & Model Support
-
-| Feature | karpathy/llm-council | Model Behavior |
-|---|---|---|
+| Feature | karpathy/llm-council | Conclave |
+| --- | --- | --- |
 | Providers | OpenRouter only | OpenRouter, Ollama (local + cloud), Gemini, OpenAI |
-| Response mode | Wait for everything | Streaming (results appear phase by phase) |
-| Local / offline models | ❌ | ✅ Via Ollama, runs on your own PC, fully private |
-| Mix providers in one council | ❌ | ✅ e.g. local Llama + cloud Gemini + GPT via OpenRouter simultaneously |
-| Model config format | Simple list of model name strings | Objects with `provider`, `model`, and `name` per entry |
-| API keys needed | `OPENROUTER_API_KEY` only | One or more of: OpenRouter, Google, OpenAI, Ollama |
-
-### ⚙️ Process & Modes
-
-| Feature | karpathy/llm-council | Model Behavior |
-|---|---|---|
-| Council mode (3-stage) | ✅ Original | ✅ Preserved with minor UI changes |
-| Debate mode (4-phase) | ❌ | ✅ Socratic → Debate → Devil's Advocate → Synthesis |
-| Anonymous peer review | ✅ Model identities hidden during ranking | ✅ Preserved from original |
-| Response delivery | Wait for all responses | Streaming (results appear phase by phase) |
-| UI | ✅ | ✅ Improved UI for readability and clarity |
-| Model connectivity test | ❌ | ✅ 📡 "Test Models" button pings all LLMs and shows live status & latency |
-| File upload | ❌ | ✅ 📎 Attach pdf, docx, txt, sh, py, md, xls, xlsx; full text sent to the council |
-
-### 💾 Export & Data
-
-| Feature | karpathy/llm-council | Model Behavior |
-|---|---|---|
-| Export results | ❌ | ✅ Markdown and HTML (both modes) |
+| Response delivery | Wait for everything | Streaming, results appear phase by phase |
+| Council mode | 3-stage (original) | Preserved with minor UI changes |
+| Debate mode | None | 4-phase: Socratic, Debate, Devil's Advocate, Synthesis |
+| File upload | None | PDF, DOCX, XLSX, TXT, code, markdown |
+| Conversation history | None | Persistent, sidebar, rename/clear/delete |
+| Model connectivity test | None | Ping all configured models, see latency |
+| Export | None | Markdown or self-contained interactive HTML |
+| UI | Functional | Restructured for readability and clarity |
 
 ---
 
 ## Two Modes
 
-### 🏛️ Council Mode (original)
-The classic Karpathy 3-stage process:
-1. **Stage 1:** All models answer independently
-2. **Stage 2:** Models review and rank each others' answers anonymously
-3. **Stage 3:** Chairman synthesizes the final answer
+### Council Mode (the original Karpathy flow)
 
-### 🔀 Debate Mode (new)
-A more conversational 4-phase process inspired by how humans actually debate:
-1. **Phase 1 (Socratic):** All models form their initial understanding
-2. **Phase 2 (Debate):** Each model reads the others' answers and agrees, disagrees, or adds nuance
-3. **Phase 3 (Devil's Advocate):** One model challenges the emerging consensus head-on
-4. **Phase 4 (Synthesis):** The Chairman delivers a final answer informed by the full debate
+1. **Stage 1**: All models answer independently
+2. **Stage 2**: Models read anonymized versions of each other's answers and rank them
+3. **Stage 3**: The Chairman synthesizes a final answer from the responses and the parsed rankings
 
-→ [See the UI in action](ui-preview.png)
+### Debate Mode
+
+A more conversational four-phase process:
+
+1. **Phase 1, Socratic**: All models form their initial answer
+2. **Phase 2, Debate**: Each model reads the others' answers and is explicitly told it's fine to strongly disagree. Agreements, disagreements, and gaps get surfaced.
+3. **Phase 3, Devil's Advocate**: A separate model (excluded from Phases 1 and 2 so it arrives fresh) identifies the emerging consensus and argues against it as forcefully as it can.
+4. **Phase 4, Synthesis**: The Chairman delivers a final answer informed by Phases 2 and 3.
+
+The Chairman and Devil's Advocate are deliberately isolated from the council to avoid them judging or reinforcing their own output.
 
 ---
 
-## 📎 File Upload
+## File Upload
 
-You can attach a file to any query and ask the council to analyze, summarize, review, or discuss its contents.
+Drop a file into the chat and the council debates it.
 
-**How to use:**
-1. Open or create a conversation and choose your mode (Council or Debate)
-2. Click the **📎** button to the left of the text input
-3. Pick a file. Supported formats: `pdf`, `docx`, `txt`, `sh`, `py`, `md`, `xls`, `xlsx` (max 20 MB)
-4. A file chip appears below the input showing the filename. You can click ✕ to remove it.
-5. Optionally type a question alongside the file (e.g. *"summarize this"*, *"what are the risks here?"*). You can also send without any text; the council will analyze the file directly.
-6. Click **Send to Council**. The file's text is extracted on the backend and prepended to your message so every model and the Chairman receive the full document as context.
+**Supported types**: PDF, DOCX, XLSX, XLS, TXT, MD, PY, SH. Up to 20 MB.
 
-**Supported file types:**
+The backend extracts plain text (PyPDF, python-docx, openpyxl, etc.), prepends it to your message as `[File: filename]`, and the result becomes the question every model sees. Files are never written to disk. Works in both Council and Debate modes, with no separate "summarize this" path: whatever you ask, the council debates with the file as context.
 
-| Extension | What gets extracted |
-|-----------|---------------------|
-| `pdf` | All page text via `pypdf` |
-| `docx` | All paragraph text via `python-docx` |
-| `xlsx` | Cell values from all sheets via `openpyxl` |
-| `xls` | Cell values from all sheets via `xlrd` |
-| `txt`, `sh`, `py`, `md` | Raw UTF-8 text |
+---
 
-> File content is never stored: it is extracted, prepended to the message, and discarded. The conversation history stores only the final assembled message text.
+## Conversation History
+
+Every conversation is saved as JSON in `data/conversations/`. The sidebar shows all past conversations sorted newest first, with message counts. Rename, clear messages, or delete entirely.
+
+Once a conversation has its first reply, the mode toggle locks. New conversations stay unlocked until they get a response.
 
 ---
 
 ## Setup
 
-> **Windows users, new to this?** Follow every step in order. Don't skip any section, even if it looks optional.
+### 1. Install dependencies
 
----
-
-### Step 0: Install the required tools
-
-You need four tools installed before anything else. Install them in this order:
-
-**1. Git** (used to download the project)
-- Go to https://git-scm.com/download/win
-- Download the installer and run it. Click **Next** through all the screens. The defaults are fine.
-
-**2. Node.js** (used to run the frontend)
-- Go to https://nodejs.org
-- Download the **LTS** version (the one labelled "Recommended For Most Users") and run the installer. Defaults are fine.
-
-**3. Python** (required by the backend)
-- Go to https://www.python.org/downloads/
-- Download the latest version and run the installer.
-- ⚠️ On the very first screen, check the box that says **"Add Python to PATH"** before clicking Install. If you miss this, things won't work.
-
-**4. uv** (a Python tool that manages the backend's packages)
-- Open the Windows search bar, type `powershell`, and open **Windows PowerShell**.
-- Paste this command and press Enter:
-```
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-- Close PowerShell once it finishes.
-
----
-
-### Step 1: Download the project
-
-1. Decide where you want to keep the project. A simple place is your **Documents** folder.
-2. Open **Windows PowerShell** again (search for it in the Start menu).
-3. Navigate to your Documents folder by typing this and pressing Enter:
-```
-cd ~/Documents
-```
-4. Now download the project by running:
-```
-git clone https://github.com/Niiblr/model-behavior.git
-```
-This creates a new folder called `model-behavior` inside your Documents folder. That folder is your **project root**, where everything lives.
-
-5. Move into that folder:
-```
-cd model-behavior
-```
-> Keep this PowerShell window open. You'll need it for the next steps.
-
----
-
-### Step 2: Install dependencies
-
-The project has two parts: a **backend** (the Python engine) and a **frontend** (the visual interface in your browser). Each needs its own packages installed.
-
-**Backend:** run this from inside the `model-behavior` folder:
+**Backend:**
 ```
 uv sync
 ```
 
-**Frontend:** run these three commands one at a time, pressing Enter after each:
+**Frontend:**
 ```
 cd frontend
 npm install
 cd ..
 ```
-The last `cd ..` brings you back to the `model-behavior` root folder.
 
----
+### 2. Configure API keys
 
-### Step 3: Configure your API keys
-
-API keys are passwords that let the app talk to AI providers like OpenAI or Google. You need at least one.
-
-1. Inside the `model-behavior` folder, find the file called `.env.example`.
-2. Make a copy of it and rename the copy to `.env` (no `.example` at the end).
-   - In File Explorer: right-click → Copy, then right-click → Paste, then rename it.
-   - ⚠️ Make sure it's named exactly `.env`, not `.env.txt` or anything else.
-3. Open `.env` with Notepad and fill in the keys for the providers you want to use:
+Create a `.env` file in the project root with whichever providers you intend to use:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
 GOOGLE_API_KEY=...
 OPENAI_API_KEY=...
-OLLAMA_CLOUD_API_KEY=...
 ```
 
-You only need keys for the providers you intend to use. Leave the others blank or delete those lines.
+You only need keys for the providers you actually call. Ollama (local or cloud) needs no key here: Ollama itself handles auth via its own config.
 
-> Not sure where to get keys? OpenRouter is the easiest starting point. Sign up at https://openrouter.ai and you can access many models with a single key.
+### 3. Configure models
 
-## Flexible Model Mixing
-
-One of the most powerful features of Model Behavior is that you can mix any 
-combination of providers in the same council simultaneously:
-
-- **Cloud models via OpenRouter:** single API key, access to GPT, Claude, Gemini, Grok and more
-- **Direct API keys:** connect to Google Gemini, OpenAI, or others directly without OpenRouter
-- **Ollama cloud models:** large models running on Ollama's cloud servers
-- **Ollama local models:** models running entirely on your own machine, free and private
-
-A council of a local Llama 3 on your PC, a cloud Gemini via direct API, 
-and a GPT model via OpenRouter all debating the same question is completely valid.
-
-### Setting up Ollama models
-
-Ollama gives you two ways to run models: **locally** on your own PC, or on **Ollama's cloud servers**. You can use one or both at the same time.
-
----
-
-#### 🖥️ Option A: Local models (free, fully private)
-
-Local models run entirely on your own machine. Nothing is sent to the internet. They're free to use but require enough RAM (see table below) and are slower than cloud models.
-
-**Install Ollama:**
-1. Go to https://ollama.com/download
-2. Click **Download for Windows**. This is a standard `.exe` installer, just like any other Windows program.
-3. Run the installer and follow the prompts. Once finished, Ollama runs quietly in the background (you'll see its icon in the system tray near the clock).
-
-**Download a model:**
-
-Open PowerShell and run one of these commands depending on which model you want. Each one downloads a model to your PC. This may take a few minutes depending on your internet speed.
-```
-ollama pull llama3
-ollama pull mistral
-ollama pull gemma3
-```
-> Not sure which to pick? Start with `llama3`. It's a solid all-rounder and works well on most PCs with 8GB of RAM.
-
-**Add it to your council** in `backend/config.py`:
-```python
-{
-    "provider": ollama_local,
-    "model": "llama3",
-    "name": "Llama 3 (Local)"
-}
-```
-
-**RAM requirements:**
-
-| Model size | Minimum RAM | Example models |
-|---|---|---|
-| 7B | 8 GB | llama3, mistral, gemma3 |
-| 13B | 16 GB | llama2:13b, codellama:13b |
-| 34B | 32 GB | llama2:34b |
-| 70B+ | 64 GB+ | Not recommended for most PCs |
-
-> Not sure how much RAM your PC has? Press `Windows + Pause/Break` or search "About your PC" in the Start menu. It's listed there as "Installed RAM".
-
----
-
-#### ☁️ Option B: Ollama cloud models (no local hardware needed)
-
-Ollama also hosts models on their own servers, which you access over the internet. This means you can use large, powerful models without needing a high-end PC. Ollama has generous free daily and weekly token limits, so for most casual use you're unlikely to hit them, and no billing is required to get started.
-
-**Get an API key:**
-1. Go to https://ollama.com and create an account.
-2. Navigate to your account settings and generate an API key.
-3. Add it to your `.env` file:
-```
-OLLAMA_CLOUD_API_KEY=...
-```
-
-**Pull the model** in PowerShell using the `:cloud` tag:
-```
-ollama pull llama3:70b:cloud
-```
-
-**Then add it to your council** in `backend/config.py`:
-```python
-{
-    "provider": ollama_cloud,
-    "model": "llama3:70b",
-    "name": "Llama 3 70B (Cloud)"
-}
-```
-
-> The difference from local is just `ollama_cloud` instead of `ollama_local` as the provider. Everything else works the same way.
-
----
-
-> 💡 **You can mix both.** A council with a local 7B model on your PC *and* a large cloud model on Ollama's servers is completely valid, and costs less than running everything through OpenAI.
-
-### Step 4: Configure your models
-
-Edit `backend/config.py` to set up your council.
-> To open this file: in File Explorer, go to `Documents → model-behavior → backend` and open `config.py` with Notepad (right-click → Open with → Notepad). Each model needs a `provider`, `model`, and `name`:
+Edit `backend/[config.py](http://config.py)`. Each council member needs `provider`, `model`, and `name`:
 
 ```python
 COUNCIL_MODELS = [
     {
         "provider": gemini,
-        "model": "gemini-3-flash-preview",
-        "name": "Gemini 3.0 Flash"
+        "model": "gemini-3-flash",
+        "name": "Gemini 3 Flash"
+    },
+    {
+        "provider": ollama,
+        "model": "kimi-k2-thinking:cloud",
+        "name": "Kimi K2 Thinking"
     },
     {
         "provider": openrouter,
-        "model": "openai/gpt-5.1",
-        "name": "GPT-5.1"
+        "model": "arcee-ai/arcee-spotlight:free",
+        "name": "Arcee Spotlight"
     },
 ]
 
 CHAIRMAN_CONFIG = {
-    "provider": gemini,
-    "model": "gemini-3-pro-preview",
-    "name": "Chairman Gemini"
+    "provider": ollama,
+    "model": "deepseek-v3.1:671b-cloud",
+    "name": "DeepSeek V3.1 671B"
+}
+
+DEVILS_ADVOCATE_CONFIG = {
+    "provider": ollama,
+    "model": "kimi-k2-thinking:cloud",
+    "name": "Kimi K2 Thinking"
 }
 ```
+
+Verify model IDs against each provider's current list before running. Provider routing is automatic: anything with a `:cloud` suffix goes to Ollama's cloud infrastructure, anything else runs locally.
+
+---
+
+## Mixing Providers
+
+A council can freely mix:
+
+- **Cloud models via OpenRouter**, one API key gets you GPT, Claude, Gemini, Grok, and others
+- **Direct API keys** for Gemini or OpenAI when you want to skip OpenRouter
+- **Ollama Cloud models** for large hosted models (Kimi K2 Thinking, DeepSeek V3.1 671B, GPT-OSS 120B, Qwen3 80B, GLM-5, etc.)
+- **Ollama local models** running entirely on your machine
+
+A council of a local Llama on your PC, a cloud Gemini via direct API, and a GPT model via OpenRouter is a perfectly valid setup.
+
+### Setting up local models with Ollama
+
+1. Install Ollama from <https://ollama.com>
+2. Pull any model:
+```
+   ollama pull llama3
+   ollama pull mistral
+   ollama pull gemma3
+```
+3. Add it to your council in `backend/[config.py](http://config.py)`:
+```python
+   {
+       "provider": ollama,
+       "model": "llama3",
+       "name": "Llama 3 (Local)"
+   }
+```
+
+### RAM requirements for local models
+
+| Model size | Minimum RAM |
+| --- | --- |
+| 7B | 8GB |
+| 13B | 16GB |
+| 34B | 32GB |
+| 70B+ | 64GB+, not recommended |
+
+Local models are slower but completely private. Nothing leaves your machine.
 
 ---
 
 ## Running the App
 
-**Terminal 1 (Backend):**
+**Terminal 1, backend:**
 ```
 cd backend
 uv run python -m backend.main
 ```
 
-**Terminal 2 (Frontend):**
+**Terminal 2, frontend:**
 ```
 cd frontend
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Or just run `./[start.sh](http://start.sh)` from the repo root, which starts both and traps Ctrl+C to stop both cleanly.
+
+Open <http://localhost:5173> in your browser.
 
 ---
+
+## Test Your Models
+
+The "Test Models" button in the sidebar pings every configured model in parallel (council, Chairman, Devil's Advocate, deduplicated) and shows status and latency for each. Useful for catching a misnamed model ID or a dead provider before you start a debate.
+
+---
+
+## Export
+
+Once a conversation has at least one reply, two export options appear:
+
+- **Markdown**: a clean `.md` of the full conversation, including all stages or phases
+- **HTML**: a self-contained interactive page with embedded CSS, tabbed views for multi-model phases, color-coded blocks for synthesis and rankings. No external dependencies, just open it in a browser.
+
+---
+
 ## Staying Up to Date
-Run this to get the latest version:
+
 ```
 git pull origin main
 ```
 
----
-## Changelog
-Consult changes [here](CHANGELOG.md)
+Changelog: [[CHANGELOG.md](http://CHANGELOG.md)](./[CHANGELOG.md](http://CHANGELOG.md))
 
 ---
+
 ## Tech Stack
 
-- **Backend:** FastAPI (Python), async, multi-provider LLM support
-- **Frontend:** React + Vite, streaming SSE, ReactMarkdown
-- **Storage:** JSON files in `data/conversations/`
-- **Package management:** uv (Python), npm (JavaScript)
+- **Backend**: FastAPI, fully async, four provider classes hitting each LLM API directly via httpx (no SDK dependencies)
+- **Frontend**: React + Vite, SSE streaming, ReactMarkdown
+- **Storage**: JSON files in `data/conversations/`
+- **Package management**: uv (Python), npm (JavaScript)
 
 ---
 
