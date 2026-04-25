@@ -218,7 +218,7 @@ Once a conversation has at least one reply, two export options appear:
 git pull origin main
 ```
 
-Changelog: [[CHANGELOG.md](http://CHANGELOG.md)](./[CHANGELOG.md](http://CHANGELOG.md))
+Changelog: [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
