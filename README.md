@@ -1,7 +1,7 @@
 # Model Behavior
 ### by Niiblr
 
-![header](https://raw.githubusercontent.com/Niiblr/model-behavior/master/header.jpg)
+![header](https://raw.githubusercontent.com/Niiblr/model-behavior/main/header.jpg)
 
 > *Multiple AIs walk into a room.*
 
@@ -25,8 +25,8 @@ The goal is a more pressure-tested answer than any single model could produce on
 | Feature | karpathy/llm-council | Model Behavior |
 |---|---|---|
 | Providers | OpenRouter only | OpenRouter, Ollama (local + cloud), Gemini, OpenAI |
-| Response mode | Wait for everything | Streaming — results appear phase by phase |
-| Local / offline models | ❌ | ✅ Via Ollama — runs on your own PC, fully private |
+| Response mode | Wait for everything | Streaming (results appear phase by phase) |
+| Local / offline models | ❌ | ✅ Via Ollama, runs on your own PC, fully private |
 | Mix providers in one council | ❌ | ✅ e.g. local Llama + cloud Gemini + GPT via OpenRouter simultaneously |
 | Model config format | Simple list of model name strings | Objects with `provider`, `model`, and `name` per entry |
 | API keys needed | `OPENROUTER_API_KEY` only | One or more of: OpenRouter, Google, OpenAI, Ollama |
@@ -38,10 +38,10 @@ The goal is a more pressure-tested answer than any single model could produce on
 | Council mode (3-stage) | ✅ Original | ✅ Preserved with minor UI changes |
 | Debate mode (4-phase) | ❌ | ✅ Socratic → Debate → Devil's Advocate → Synthesis |
 | Anonymous peer review | ✅ Model identities hidden during ranking | ✅ Preserved from original |
-| Response delivery | Wait for all responses | Streaming — results appear phase by phase |
+| Response delivery | Wait for all responses | Streaming (results appear phase by phase) |
 | UI | ✅ | ✅ Improved UI for readability and clarity |
 | Model connectivity test | ❌ | ✅ 📡 "Test Models" button pings all LLMs and shows live status & latency |
-| File upload | ❌ | ✅ 📎 Attach pdf, docx, txt, sh, py, md, xls, xlsx — full text sent to the council |
+| File upload | ❌ | ✅ 📎 Attach pdf, docx, txt, sh, py, md, xls, xlsx; full text sent to the council |
 
 ### 💾 Export & Data
 
@@ -55,16 +55,16 @@ The goal is a more pressure-tested answer than any single model could produce on
 
 ### 🏛️ Council Mode (original)
 The classic Karpathy 3-stage process:
-1. **Stage 1** — All models answer independently
-2. **Stage 2** — Models review and rank each others' answers anonymously
-3. **Stage 3** — Chairman synthesizes the final answer
+1. **Stage 1:** All models answer independently
+2. **Stage 2:** Models review and rank each others' answers anonymously
+3. **Stage 3:** Chairman synthesizes the final answer
 
 ### 🔀 Debate Mode (new)
 A more conversational 4-phase process inspired by how humans actually debate:
-1. **Phase 1 (Socratic)** — All models form their initial understanding
-2. **Phase 2 (Debate)** — Each model reads the others' answers and agrees, disagrees, or adds nuance
-3. **Phase 3 (Devil's Advocate)** — One model challenges the emerging consensus head-on
-4. **Phase 4 (Synthesis)** — The Chairman delivers a final answer informed by the full debate
+1. **Phase 1 (Socratic):** All models form their initial understanding
+2. **Phase 2 (Debate):** Each model reads the others' answers and agrees, disagrees, or adds nuance
+3. **Phase 3 (Devil's Advocate):** One model challenges the emerging consensus head-on
+4. **Phase 4 (Synthesis):** The Chairman delivers a final answer informed by the full debate
 
 → [See the UI in action](ui-preview.png)
 
@@ -77,10 +77,10 @@ You can attach a file to any query and ask the council to analyze, summarize, re
 **How to use:**
 1. Open or create a conversation and choose your mode (Council or Debate)
 2. Click the **📎** button to the left of the text input
-3. Pick a file — supported formats: `pdf`, `docx`, `txt`, `sh`, `py`, `md`, `xls`, `xlsx` (max 20 MB)
+3. Pick a file. Supported formats: `pdf`, `docx`, `txt`, `sh`, `py`, `md`, `xls`, `xlsx` (max 20 MB)
 4. A file chip appears below the input showing the filename. You can click ✕ to remove it.
-5. Optionally type a question alongside the file (e.g. *"summarize this"*, *"what are the risks here?"*). You can also send without any text — the council will analyze the file directly.
-6. Click **Send to Council** — the file's text is extracted on the backend and prepended to your message so every model and the Chairman receive the full document as context.
+5. Optionally type a question alongside the file (e.g. *"summarize this"*, *"what are the risks here?"*). You can also send without any text; the council will analyze the file directly.
+6. Click **Send to Council**. The file's text is extracted on the backend and prepended to your message so every model and the Chairman receive the full document as context.
 
 **Supported file types:**
 
@@ -92,23 +92,23 @@ You can attach a file to any query and ask the council to analyze, summarize, re
 | `xls` | Cell values from all sheets via `xlrd` |
 | `txt`, `sh`, `py`, `md` | Raw UTF-8 text |
 
-> File content is never stored — it is extracted, prepended to the message, and discarded. The conversation history stores only the final assembled message text.
+> File content is never stored: it is extracted, prepended to the message, and discarded. The conversation history stores only the final assembled message text.
 
 ---
 
 ## Setup
 
-> **Windows users — new to this?** Follow every step in order. Don't skip any section, even if it looks optional.
+> **Windows users, new to this?** Follow every step in order. Don't skip any section, even if it looks optional.
 
 ---
 
-### Step 0 — Install the required tools
+### Step 0: Install the required tools
 
 You need four tools installed before anything else. Install them in this order:
 
 **1. Git** (used to download the project)
 - Go to https://git-scm.com/download/win
-- Download the installer and run it. Click **Next** through all the screens — the defaults are fine.
+- Download the installer and run it. Click **Next** through all the screens. The defaults are fine.
 
 **2. Node.js** (used to run the frontend)
 - Go to https://nodejs.org
@@ -129,7 +129,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ---
 
-### Step 1 — Download the project
+### Step 1: Download the project
 
 1. Decide where you want to keep the project. A simple place is your **Documents** folder.
 2. Open **Windows PowerShell** again (search for it in the Start menu).
@@ -141,26 +141,26 @@ cd ~/Documents
 ```
 git clone https://github.com/Niiblr/model-behavior.git
 ```
-This creates a new folder called `model-behavior` inside your Documents folder. That folder is your **project root** — it's where everything lives.
+This creates a new folder called `model-behavior` inside your Documents folder. That folder is your **project root**, where everything lives.
 
 5. Move into that folder:
 ```
 cd model-behavior
 ```
-> Keep this PowerShell window open — you'll need it for the next steps.
+> Keep this PowerShell window open. You'll need it for the next steps.
 
 ---
 
-### Step 2 — Install dependencies
+### Step 2: Install dependencies
 
 The project has two parts: a **backend** (the Python engine) and a **frontend** (the visual interface in your browser). Each needs its own packages installed.
 
-**Backend** — run this from inside the `model-behavior` folder:
+**Backend:** run this from inside the `model-behavior` folder:
 ```
 uv sync
 ```
 
-**Frontend** — run these three commands one at a time, pressing Enter after each:
+**Frontend:** run these three commands one at a time, pressing Enter after each:
 ```
 cd frontend
 npm install
@@ -170,14 +170,14 @@ The last `cd ..` brings you back to the `model-behavior` root folder.
 
 ---
 
-### Step 3 — Configure your API keys
+### Step 3: Configure your API keys
 
 API keys are passwords that let the app talk to AI providers like OpenAI or Google. You need at least one.
 
 1. Inside the `model-behavior` folder, find the file called `.env.example`.
 2. Make a copy of it and rename the copy to `.env` (no `.example` at the end).
    - In File Explorer: right-click → Copy, then right-click → Paste, then rename it.
-   - ⚠️ Make sure it's named exactly `.env` — not `.env.txt` or anything else.
+   - ⚠️ Make sure it's named exactly `.env`, not `.env.txt` or anything else.
 3. Open `.env` with Notepad and fill in the keys for the providers you want to use:
 
 ```
@@ -187,19 +187,19 @@ OPENAI_API_KEY=...
 OLLAMA_CLOUD_API_KEY=...
 ```
 
-You only need keys for the providers you intend to use — leave the others blank or delete those lines.
+You only need keys for the providers you intend to use. Leave the others blank or delete those lines.
 
-> Not sure where to get keys? OpenRouter is the easiest starting point — sign up at https://openrouter.ai and you can access many models with a single key.
+> Not sure where to get keys? OpenRouter is the easiest starting point. Sign up at https://openrouter.ai and you can access many models with a single key.
 
 ## Flexible Model Mixing
 
 One of the most powerful features of Model Behavior is that you can mix any 
 combination of providers in the same council simultaneously:
 
-- **Cloud models via OpenRouter** — single API key, access to GPT, Claude, Gemini, Grok and more
-- **Direct API keys** — connect to Google Gemini, OpenAI, or others directly without OpenRouter
-- **Ollama cloud models** — large models running on Ollama's cloud servers
-- **Ollama local models** — models running entirely on your own machine, free and private
+- **Cloud models via OpenRouter:** single API key, access to GPT, Claude, Gemini, Grok and more
+- **Direct API keys:** connect to Google Gemini, OpenAI, or others directly without OpenRouter
+- **Ollama cloud models:** large models running on Ollama's cloud servers
+- **Ollama local models:** models running entirely on your own machine, free and private
 
 A council of a local Llama 3 on your PC, a cloud Gemini via direct API, 
 and a GPT model via OpenRouter all debating the same question is completely valid.
@@ -210,24 +210,24 @@ Ollama gives you two ways to run models: **locally** on your own PC, or on **Oll
 
 ---
 
-#### 🖥️ Option A — Local models (free, fully private)
+#### 🖥️ Option A: Local models (free, fully private)
 
 Local models run entirely on your own machine. Nothing is sent to the internet. They're free to use but require enough RAM (see table below) and are slower than cloud models.
 
 **Install Ollama:**
 1. Go to https://ollama.com/download
-2. Click **Download for Windows** — this is a standard `.exe` installer, just like any other Windows program.
+2. Click **Download for Windows**. This is a standard `.exe` installer, just like any other Windows program.
 3. Run the installer and follow the prompts. Once finished, Ollama runs quietly in the background (you'll see its icon in the system tray near the clock).
 
 **Download a model:**
 
-Open PowerShell and run one of these commands depending on which model you want. Each one downloads a model to your PC — this may take a few minutes depending on your internet speed.
+Open PowerShell and run one of these commands depending on which model you want. Each one downloads a model to your PC. This may take a few minutes depending on your internet speed.
 ```
 ollama pull llama3
 ollama pull mistral
 ollama pull gemma3
 ```
-> Not sure which to pick? Start with `llama3` — it's a solid all-rounder and works well on most PCs with 8GB of RAM.
+> Not sure which to pick? Start with `llama3`. It's a solid all-rounder and works well on most PCs with 8GB of RAM.
 
 **Add it to your council** in `backend/config.py`:
 ```python
@@ -247,13 +247,13 @@ ollama pull gemma3
 | 34B | 32 GB | llama2:34b |
 | 70B+ | 64 GB+ | Not recommended for most PCs |
 
-> Not sure how much RAM your PC has? Press `Windows + Pause/Break` or search "About your PC" in the Start menu — it's listed there as "Installed RAM".
+> Not sure how much RAM your PC has? Press `Windows + Pause/Break` or search "About your PC" in the Start menu. It's listed there as "Installed RAM".
 
 ---
 
-#### ☁️ Option B — Ollama cloud models (no local hardware needed)
+#### ☁️ Option B: Ollama cloud models (no local hardware needed)
 
-Ollama also hosts models on their own servers, which you access over the internet. This means you can use large, powerful models without needing a high-end PC. Ollama has generous free daily and weekly token limits, so for most casual use you're unlikely to hit them — and no billing is required to get started.
+Ollama also hosts models on their own servers, which you access over the internet. This means you can use large, powerful models without needing a high-end PC. Ollama has generous free daily and weekly token limits, so for most casual use you're unlikely to hit them, and no billing is required to get started.
 
 **Get an API key:**
 1. Go to https://ollama.com and create an account.
@@ -277,13 +277,13 @@ ollama pull llama3:70b:cloud
 }
 ```
 
-> The difference from local is just `ollama_cloud` instead of `ollama_local` as the provider — everything else works the same way.
+> The difference from local is just `ollama_cloud` instead of `ollama_local` as the provider. Everything else works the same way.
 
 ---
 
-> 💡 **You can mix both.** A council with a local 7B model on your PC *and* a large cloud model on Ollama's servers is completely valid — and costs less than running everything through OpenAI.
+> 💡 **You can mix both.** A council with a local 7B model on your PC *and* a large cloud model on Ollama's servers is completely valid, and costs less than running everything through OpenAI.
 
-### Step 4 — Configure your models
+### Step 4: Configure your models
 
 Edit `backend/config.py` to set up your council.
 > To open this file: in File Explorer, go to `Documents → model-behavior → backend` and open `config.py` with Notepad (right-click → Open with → Notepad). Each model needs a `provider`, `model`, and `name`:
@@ -313,13 +313,13 @@ CHAIRMAN_CONFIG = {
 
 ## Running the App
 
-**Terminal 1 — Backend:**
+**Terminal 1 (Backend):**
 ```
 cd backend
 uv run python -m backend.main
 ```
 
-**Terminal 2 — Frontend:**
+**Terminal 2 (Frontend):**
 ```
 cd frontend
 npm run dev
