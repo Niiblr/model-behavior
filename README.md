@@ -8,7 +8,7 @@
 
 A multi-LLM debate engine. Mix local Ollama, Gemini, OpenAI, and OpenRouter models in one council. Ask a question or upload a document, watch them debate it across multiple phases, get a synthesized answer.
 
-Originally inspired by [Andrej Karpathy's llm-council](https://github.com/karpathy/llm-council), which sends a question to multiple LLMs, has them rank each other, and synthesizes an answer. Conclave keeps that core idea and builds on it: a four-phase debate mode, file upload, persistent conversations, streaming, and a fully self-contained HTML export.
+Originally inspired by [Andrej Karpathy's llm-council](https://github.com/karpathy/llm-council), which sends a question to multiple LLMs, has them rank each other, and synthesizes an answer. Conclave keeps that core idea and builds on it: a four-phase debate mode, voting-round consensus debates between free models, file upload, persistent conversations, streaming, and a fully self-contained HTML export.
 
 ---
 
@@ -20,15 +20,17 @@ Originally inspired by [Andrej Karpathy's llm-council](https://github.com/karpat
 | Response delivery | Wait for everything | Streaming, results appear phase by phase |
 | Council mode | 3-stage (original) | Preserved with minor UI changes |
 | Debate mode | None | 4-phase: Socratic, Debate, Devil's Advocate, Synthesis |
+| Consensus mode | None | Free models debate in voting rounds until a majority agrees |
+| Dynamic free-model roster | None | Discovers every currently-free OpenRouter model live from the models.dev catalog |
 | File upload | None | PDF, DOCX, XLSX, TXT, code, markdown |
 | Conversation history | None | Persistent, sidebar, rename/clear/delete |
 | Model connectivity test | None | Ping all configured models, see latency |
 | Export | None | Markdown or self-contained interactive HTML |
-| UI | Functional | Restructured for readability and clarity |
+| UI | Functional | Redesigned: dark & light themes, unified composer, live progress rail |
 
 ---
 
-## Two Modes
+## Three Modes
 
 ### Council Mode (the original Karpathy flow)
 
@@ -47,6 +49,20 @@ A more conversational four-phase process:
 
 The Chairman and Devil's Advocate are deliberately isolated from the council to avoid them judging or reinforcing their own output.
 
+### Consensus Mode
+
+A debate that runs until the models actually agree — using only models that cost nothing.
+
+1. **Pick your roster**: Conclave fetches the [models.dev](https://models.dev) catalog and lists every currently-free OpenRouter chat model (~24 at any given time). Pick 3–8 participants and designate one as the non-voting Chairman.
+2. **Opening statements**: every model drafts its initial position in parallel.
+3. **Debate rounds**: each model reads the full transcript (identities visible), argues, refines, and ends with a structured vote: `CONSENSUS: YES` or `NO`, plus its current final position.
+4. **Majority rules**: a strict majority of YES votes ends the debate. The Chairman then verifies the majority's positions genuinely align — if they conflict, a reconciliation round is forced.
+5. **Synthesis**: the Chairman delivers the council's shared final answer, noting any dissent honestly.
+
+Free-tier endpoints are flaky, so Consensus mode expects trouble. Models that fail twice are silently dropped from the roster (shown as "failed to respond"), the debate continues with whatever quorum remains, and if the designated Chairman's endpoint dies mid-debate another healthy participant steps in as an *(acting)* chairman.
+
+> Just want to try Consensus mode? `OPENROUTER_API_KEY` alone is enough — the OpenRouter free tier costs nothing.
+
 ---
 
 ## File Upload
@@ -55,7 +71,7 @@ Drop a file into the chat and the council debates it.
 
 **Supported types**: PDF, DOCX, XLSX, XLS, TXT, MD, PY, SH. Up to 20 MB.
 
-The backend extracts plain text (PyPDF, python-docx, openpyxl, etc.), prepends it to your message as `[File: filename]`, and the result becomes the question every model sees. Files are never written to disk. Works in both Council and Debate modes, with no separate "summarize this" path: whatever you ask, the council debates with the file as context.
+The backend extracts plain text (PyPDF, python-docx, openpyxl, etc.), prepends it to your message as `[File: filename]`, and the result becomes the question every model sees. Files are never written to disk. Works in all three modes, with no separate "summarize this" path: whatever you ask, the council debates with the file as context.
 
 ---
 
@@ -93,7 +109,7 @@ GOOGLE_API_KEY=...
 OPENAI_API_KEY=...
 ```
 
-You only need keys for the providers you actually call. Ollama (local or cloud) needs no key here: Ollama itself handles auth via its own config.
+You only need keys for the providers you actually call. Ollama (local or cloud) needs no key here: Ollama itself handles auth via its own config. For Consensus mode, `OPENROUTER_API_KEY` alone is enough.
 
 ### 3. Configure models
 
@@ -132,6 +148,8 @@ DEVILS_ADVOCATE_CONFIG = {
 ```
 
 Verify model IDs against each provider's current list before running. Provider routing is automatic: anything with a `:cloud` suffix goes to Ollama's cloud infrastructure, anything else runs locally.
+
+> Consensus Mode skips `config.py` entirely — its participants come from the live free-model roster you pick in the UI at send time.
 
 ---
 
@@ -207,8 +225,10 @@ The "Test Models" button in the sidebar pings every configured model in parallel
 
 Once a conversation has at least one reply, two export options appear:
 
-- **Markdown**: a clean `.md` of the full conversation, including all stages or phases
+- **Markdown**: a clean `.md` of the full conversation, including all stages, phases, or consensus rounds
 - **HTML**: a self-contained interactive page with embedded CSS, tabbed views for multi-model phases, color-coded blocks for synthesis and rankings. No external dependencies, just open it in a browser.
+
+Both handle all three modes.
 
 ---
 

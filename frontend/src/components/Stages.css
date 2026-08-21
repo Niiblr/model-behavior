@@ -1,5 +1,5 @@
 /* ========================================
-   UNIFIED STAGES STYLING - ALL CONSISTENT
+   UNIFIED STAGES STYLING — theme-aware
    ======================================== */
 
 /* Stage Tabs - Universal Styling */
@@ -9,19 +9,19 @@
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border);
   padding-bottom: 12px;
 }
 
 .stage1-tab,
 .stage2-tab {
-  padding: 12px 20px;
-  background: #ffffff;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px 8px 0 0;
+  padding: 10px 18px;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   transition: all 0.2s ease;
   position: relative;
@@ -29,53 +29,47 @@
 
 .stage1-tab:hover,
 .stage2-tab:hover {
-  background: #f8fafc;
-  color: #2563eb;
-  border-color: #cbd5e1;
+  background: var(--surface-3);
+  color: var(--council);
+  border-color: var(--border-strong);
 }
 
 .stage1-tab.active,
 .stage2-tab.active {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, var(--council), var(--council-strong));
   color: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  border-color: transparent;
+  box-shadow: var(--shadow-sm);
   font-weight: 600;
 }
 
-.stage1-tab.active::after,
-.stage2-tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #2563eb;
+[data-theme='dark'] .stage1-tab.active,
+[data-theme='dark'] .stage2-tab.active {
+  color: #0b1220;
 }
 
 /* Stage Content - Universal Styling */
 .stage1-content,
 .stage2-content {
-  background-color: #ffffff;
+  background-color: var(--surface);
   padding: 20px;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Stage 2 Specific - Ranking Display */
 .stage2-ranking {
   margin-top: 16px;
   padding: 20px;
-  background-color: #f8fafc;
+  background-color: var(--surface-2);
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  border-left: 4px solid #2563eb;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--council);
 }
 
 .stage2-ranking h4 {
-  color: #2563eb;
+  color: var(--council);
   margin-bottom: 12px;
   font-size: 15px;
   font-weight: 600;
@@ -89,9 +83,9 @@
 
 .stage2-ranking li {
   padding: 8px 0;
-  color: #1e293b;
+  color: var(--text);
   font-size: 14px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
   line-height: 1.6;
 }
 
@@ -100,7 +94,7 @@
 }
 
 .stage2-ranking li strong {
-  color: #2563eb;
+  color: var(--council);
   font-weight: 600;
 }
 
@@ -108,14 +102,13 @@
 .aggregate-rankings {
   margin-top: 24px;
   padding: 24px;
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: var(--council-soft);
   border-radius: 12px;
-  border: 1px solid #93c5fd;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+  border: 1px solid var(--council-border);
 }
 
 .aggregate-rankings h4 {
-  color: #1e40af;
+  color: var(--council-strong);
   margin-bottom: 12px;
   font-size: 17px;
   font-weight: 600;
@@ -125,7 +118,7 @@
 }
 
 .aggregate-rankings p {
-  color: #475569;
+  color: var(--text-muted);
   font-size: 14px;
   margin-bottom: 16px;
   line-height: 1.6;
@@ -135,78 +128,81 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
+  padding: 12px 18px;
   margin-bottom: 10px;
-  background-color: #ffffff;
+  background-color: var(--surface);
   border-radius: 10px;
-  border: 1px solid #93c5fd;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.08);
+  border: 1px solid var(--council-border);
+  transition: all 0.15s ease;
 }
 
 .ranking-item:hover {
-  border-color: #60a5fa;
   transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .ranking-position {
   font-weight: 700;
-  color: #2563eb;
+  color: var(--council);
   font-size: 20px;
   min-width: 45px;
 }
 
 .ranking-model {
   flex: 1;
-  color: #1e293b;
+  color: var(--text-strong);
   font-weight: 500;
   margin: 0 16px;
   font-size: 15px;
 }
 
 .ranking-score {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
 }
 
 /* Stage 3 - Final Synthesis */
 .stage3-synthesis {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  padding: 24px;
+  background: var(--consensus-soft);
+  padding: 4px;
   border-radius: 12px;
-  border: 1px solid #6ee7b7;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+  border: 1px solid var(--consensus-border);
 }
 
 .stage3-synthesis .markdown-content {
-  background: #ffffff;
+  background: var(--surface);
   padding: 20px;
-  border-radius: 10px;
-  border: 1px solid #6ee7b7;
+  border-radius: 9px;
+  border: 1px solid var(--consensus-border);
 }
 
 .stage3-synthesis .markdown-content h1,
 .stage3-synthesis .markdown-content h2,
 .stage3-synthesis .markdown-content h3 {
-  color: #059669;
+  color: var(--consensus-strong);
+}
+
+[data-theme='dark'] .stage3-synthesis .markdown-content h1,
+[data-theme='dark'] .stage3-synthesis .markdown-content h2,
+[data-theme='dark'] .stage3-synthesis .markdown-content h3 {
+  color: var(--consensus);
 }
 
 .stage3-synthesis .markdown-content strong {
-  color: #047857;
+  color: var(--text-strong);
 }
 
 .stage3-synthesis .markdown-content code {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--consensus-soft);
+  color: var(--consensus-strong);
 }
 
 /* Unified Typography */
 .stage1 h3,
 .stage2 h3,
 .stage3 h3 {
-  color: #2563eb;
+  color: var(--council);
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -214,7 +210,7 @@
 
 /* Unified Paragraph Styling in Stage 2 */
 .stage2 > p {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 16px;

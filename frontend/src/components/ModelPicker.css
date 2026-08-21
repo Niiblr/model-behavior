@@ -1,0 +1,233 @@
+.model-picker {
+  border: 1px solid var(--consensus-border);
+  background: var(--consensus-soft);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.model-picker.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Collapse toggle */
+.mp-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: left;
+  border-radius: var(--radius-sm);
+}
+
+.mp-collapse:hover {
+  background: var(--consensus-soft);
+}
+
+.mp-collapse-label strong {
+  color: var(--text-strong);
+}
+
+.mp-collapse-chevron {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.mp-loading,
+.mp-error,
+.mp-empty {
+  padding: 14px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.mp-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+}
+
+.mp-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.mp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--consensus);
+  border-radius: 50%;
+  animation: mpSpin 0.8s linear infinite;
+}
+
+@keyframes mpSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toolbar */
+.mp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mp-count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mp-count strong {
+  color: var(--text-strong);
+  font-size: 15px;
+}
+
+.mp-count-hint.warn {
+  color: var(--warn);
+}
+
+.mp-search {
+  width: 220px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mp-search:focus {
+  border-color: var(--consensus);
+  box-shadow: 0 0 0 3px var(--consensus-soft);
+}
+
+/* List */
+.mp-list {
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  border: 1px solid transparent;
+}
+
+.mp-item:hover {
+  background: var(--surface-2);
+}
+
+.mp-item.checked {
+  background: var(--consensus-soft);
+  border-color: var(--consensus-border);
+}
+
+.mp-item input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--consensus);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.mp-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.mp-item-id {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: ui-monospace, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-chairman-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--warn);
+  background: var(--warn-soft);
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.mp-ctx {
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* Chairman selection row */
+.mp-chairman-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mp-chairman-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.mp-chairman-row select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.mp-chairman-row select:focus {
+  border-color: var(--warn);
+}

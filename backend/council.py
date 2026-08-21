@@ -1,8 +1,19 @@
 """3-stage LLM Council orchestration with multi-provider support."""
 
+import asyncio
+import re
 from typing import List, Dict, Any, Tuple
+
 from .providers import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, HYBRID_COUNCIL_MODELS, CHAIRMAN_CONFIG, DEVILS_ADVOCATE_CONFIG
+from .providers.openrouter import OpenRouterProvider
+from .config import (
+    COUNCIL_MODELS,
+    HYBRID_COUNCIL_MODELS,
+    CHAIRMAN_CONFIG,
+    DEVILS_ADVOCATE_CONFIG,
+    openrouter,
+)
+from .freemodels import get_free_models
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -536,3 +547,504 @@ async def run_hybrid_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     metadata = {"mode": "hybrid"}
 
     return phase1_results, phase2_results, phase3_result, phase4_result, metadata
+
+
+# ============================================================================
+# CONSENSUS DEBATE MODE
+# ============================================================================
+# A dynamic council assembled from free OpenRouter models (discovered via the
+# models.dev catalog). Models debate in rounds, voting after each round on
+# whether the group has converged. Strict majority ends the debate; the
+# Chairman — one of the participants, who abstains from voting — verifies that
+# majority positions actually align before declaring consensus.
+# ============================================================================
+
+CONSENSUS_MAX_FAILURES = 2      # consecutive failures before a model is dropped
+CONSENSUS_MIN_QUORUM = 3        # minimum active models to keep debating
+CONSENSUS_STAGGER_SECONDS = 5   # spacing between OpenRouter launches (free-tier rate limits)
+CONSENSUS_QUERY_TIMEOUT = 300.0 # per-model timeout (thinking free models can be slow)
+
+_VERDICT_RE = re.compile(r"CONSENSUS\s*[:\-]\s*(YES|NO)", re.IGNORECASE)
+_POSITION_RE = re.compile(r"FINAL POSITION\s*[:\-]\s*([\s\S]+)$", re.IGNORECASE)
+_ALIGNED_RE = re.compile(r"VERDICT\s*[:\-]\s*(ALIGNED|CONFLICTED)", re.IGNORECASE)
+
+
+def parse_verdict_text(text: str) -> Tuple[str, str, str]:
+    """
+    Parse the structured verdict block from a debate statement.
+
+    Returns:
+        Tuple of (verdict "YES"/"NO"/None, final_position text/None,
+        display_text with the structured block stripped out).
+    """
+    verdict = None
+    position = None
+
+    match = _VERDICT_RE.search(text)
+    if match:
+        verdict = match.group(1).upper()
+
+    pos_match = _POSITION_RE.search(text)
+    if pos_match:
+        position = pos_match.group(1).strip()
+
+    # Strip the structured tail from the text shown to the user
+    display = _VERDICT_RE.sub("", text)
+    display = _POSITION_RE.sub("", display)
+    display = re.sub(r"\n{3,}$", "\n\n", display).strip()
+
+    return verdict, position, display
+
+
+async def _resolve_participant_configs(
+    model_ids: List[str],
+    chairman_id: str
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Resolve selected model ids into provider configs using the free catalog."""
+    if openrouter is None:
+        raise RuntimeError("OPENROUTER_API_KEY is not configured; consensus debates require it (free tier is fine).")
+
+    catalog = await get_free_models()
+    by_id = {m["id"]: m for m in catalog}
+
+    def build(model_id: str) -> Dict[str, Any]:
+        info = by_id.get(model_id)
+        if info is None:
+            raise ValueError(f"Model '{model_id}' is not in the current free-model catalog.")
+        return {
+            "provider": openrouter,
+            "model": info["id"],
+            "name": info["name"],
+            "id": info["id"],
+        }
+
+    seen = set()
+    participants = []
+    for mid in model_ids:
+        if mid == chairman_id or mid in seen:
+            continue
+        seen.add(mid)
+        participants.append(build(mid))
+
+    chairman = build(chairman_id)
+    return participants, chairman
+
+
+def _format_transcript(rounds: List[Dict[str, Any]], own_name: str) -> str:
+    """Format prior rounds into a readable transcript, marking the caller's entries."""
+    parts = []
+    for round_entry in rounds:
+        lines = [f"=== ROUND {round_entry['round']} ==="]
+        for stmt in round_entry["statements"]:
+            marker = " (you)" if stmt["model"] == own_name else ""
+            status = ""
+            if stmt.get("failed"):
+                status = " [failed to respond this round]"
+            elif stmt.get("verdict"):
+                status = f" [voted CONSENSUS: {stmt['verdict']}]"
+            lines.append(f"--- {stmt['model']}{marker}{status} ---")
+            lines.append(stmt["response"])
+        parts.append("\n".join(lines))
+    return "\n\n".join(parts)
+
+
+def _build_initial_prompt(user_query: str) -> str:
+    return f"""A diverse council of AI models is convening to reach a shared consensus answer.
+
+Question: {user_query}
+
+Provide your initial position on this question. Be substantive, precise and clear — your fellow council members will read it, critique it, and build on it in later rounds."""
+
+
+def _build_debate_prompt(
+    user_query: str,
+    round_num: int,
+    max_rounds: int,
+    transcript: str,
+    chairman_note: str = ""
+) -> str:
+    note_block = f"\nCHAIRMAN'S NOTE: {chairman_note}\n" if chairman_note else ""
+    return f"""You are a member of an AI council debating a question. This is debate round {round_num} of at most {max_rounds}.{note_block}
+
+Original Question: {user_query}
+
+TRANSCRIPT SO FAR:
+{transcript}
+
+Write your contribution to this round:
+1. Respond directly to what other members said — agree where they are right, push back where they are wrong, correct factual errors.
+2. Move the group toward one precise shared answer.
+3. End your message EXACTLY with this format:
+
+CONSENSUS: YES or NO
+FINAL POSITION: <one paragraph summarizing your current best answer>
+
+Vote YES only if you believe the council has effectively converged on a shared answer (differences of wording or emphasis are fine). Vote NO if material disagreement remains."""
+
+
+def _build_review_prompt(
+    user_query: str,
+    yes_positions: List[Dict[str, str]]
+) -> str:
+    positions_text = "\n\n".join([
+        f"--- {p['model']} ---\n{p['position']}"
+        for p in yes_positions
+    ])
+    return f"""You are the Chairman of an AI council. The members just voted, and a strict majority declared that consensus has been reached on this question:
+
+{user_query}
+
+The majority's final positions:
+
+{positions_text}
+
+Before consensus can be declared, verify these positions genuinely align. They may differ in wording, emphasis or level of detail — that is acceptable. They conflict only if they assert materially different answers or recommendations.
+
+Reply in EXACTLY this format:
+
+VERDICT: ALIGNED or CONFLICTED
+REASONING: <one or two sentences explaining your judgment>"""
+
+
+def _parse_review(text: str) -> Dict[str, Any]:
+    aligned = None
+    reasoning = (text or "").strip()
+    match = _ALIGNED_RE.search(text or "")
+    if match:
+        aligned = match.group(1).upper() == "ALIGNED"
+    reason_match = re.search(r"REASONING\s*[:\-]\s*([\s\S]+)$", text or "", re.IGNORECASE)
+    if reason_match:
+        reasoning = reason_match.group(1).strip()
+    return {"aligned": aligned, "reasoning": reasoning}
+
+
+def _build_synthesis_prompt(
+    user_query: str,
+    transcript: str,
+    final_positions: List[Dict[str, str]],
+    dissent: List[Dict[str, str]],
+    consensus_declared: bool
+) -> str:
+    positions_text = "\n\n".join([
+        f"--- {p['model']} ---\n{p['position'] or p['response']}"
+        for p in final_positions
+    ])
+    dissent_text = ""
+    if dissent:
+        dissent_text = "DISSENTING VIEWS (not part of the consensus):\n" + "\n\n".join([
+            f"--- {d['model']} ---\n{d['position'] or d['response']}"
+            for d in dissent
+        ])
+
+    framing = (
+        "A strict majority of the council voted that consensus was reached."
+        if consensus_declared
+        else "The council hit the round limit without a formal majority — you must judge what shared ground exists."
+    )
+
+    return f"""You are the Chairman of an AI council that has just concluded a multi-round debate. Your task is to deliver the council's final answer.
+
+Original Question: {user_query}
+
+{framing}
+
+FULL DEBATE TRANSCRIPT:
+{transcript}
+
+MEMBERS' FINAL POSITIONS:
+{positions_text}
+
+{dissent_text}
+
+Write the definitive answer to the user's question:
+- Reflect the converged view of the council
+- Incorporate the strongest refinements made during the debate
+- If there is dissent or unresolved uncertainty, acknowledge it honestly in a brief closing note
+- Be clear, complete and well-reasoned — this is the council's final word"""
+
+
+async def run_consensus_debate_stream(
+    user_query: str,
+    model_ids: List[str],
+    chairman_id: str,
+    max_rounds: int = 4
+):
+    """
+    Async generator orchestrating a consensus debate. Yields SSE-ready event
+    dicts as they happen so the frontend can witness the debate live.
+
+    Events yielded:
+        consensus_start          {participants, chairman, max_rounds}
+        consensus_round_start    {round}
+        consensus_model_complete {round, statement}
+        consensus_round_complete {round, votes, reached}
+        consensus_chairman_review {aligned, reasoning}
+        consensus_chairman_start {}
+        consensus_synthesis_complete {model, response}
+    """
+    participants, chairman = await _resolve_participant_configs(list(model_ids), chairman_id)
+
+    all_members = [
+        {"id": m["id"], "name": m["name"]} for m in participants + [chairman]
+    ]
+    yield {
+        "type": "consensus_start",
+        "data": {
+            "participants": [{"id": m["id"], "name": m["name"]} for m in participants],
+            "chairman": {"id": chairman["id"], "name": chairman["name"]},
+            "max_rounds": max_rounds,
+        },
+    }
+
+    failures: Dict[str, int] = {m["name"]: 0 for m in participants}
+    rounds: List[Dict[str, Any]] = []
+    chairman_note = ""
+    consensus_declared = False
+
+    async def query_one(config: Dict[str, Any], messages: List[Dict[str, str]], delay: float):
+        if delay > 0:
+            await asyncio.sleep(delay)
+        try:
+            response = await query_model(
+                config["provider"],
+                config["model"],
+                messages,
+                timeout=CONSENSUS_QUERY_TIMEOUT,
+            )
+        except Exception as e:
+            print(f"[consensus] Error querying {config['name']}: {e}")
+            response = None
+        return config["name"], response
+
+    async def run_round_parallel(active: List[Dict[str, Any]], messages_builder) -> List[Tuple[str, Any]]:
+        """Fire all queries staggered; return results in completion order."""
+        tasks = [
+            asyncio.ensure_future(query_one(cfg, messages_builder(cfg), i * CONSENSUS_STAGGER_SECONDS))
+            for i, cfg in enumerate(active)
+        ]
+        results = []
+        for future in asyncio.as_completed(tasks):
+            results.append(await future)
+        return results
+
+    def active_configs() -> List[Dict[str, Any]]:
+        return [m for m in participants if failures[m["name"]] < CONSENSUS_MAX_FAILURES]
+
+    async def query_chairman(messages: List[Dict[str, str]]):
+        """
+        Query the designated chairman; if it fails (e.g. its free endpoint is
+        rate-limited), fall back to other healthy participants so the debate
+        always produces a synthesis.
+        Returns (response, config_used).
+        """
+        candidates = [chairman] + [
+            m for m in active_configs() if m["model"] != chairman["model"]
+        ]
+        for cand in candidates:
+            response = None
+            try:
+                response = await query_model(
+                    cand["provider"],
+                    cand["model"],
+                    messages,
+                    timeout=CONSENSUS_QUERY_TIMEOUT,
+                )
+            except Exception as e:
+                print(f"[consensus] Chairman candidate {cand['name']} errored: {e}")
+                response = None
+            if response and (response.get("content") or "").strip():
+                return response, cand
+            print(f"[consensus] Chairman candidate {cand['name']} unavailable; trying next.")
+        return None, None
+
+    # ------------------------------------------------------------------
+    # ROUND 0 — initial positions (no vote yet)
+    # ------------------------------------------------------------------
+    yield {"type": "consensus_round_start", "data": {"round": 0}}
+
+    round_zero_statements = []
+    for name, response in await run_round_parallel(
+        active_configs(),
+        lambda cfg: [{"role": "user", "content": _build_initial_prompt(user_query)}],
+    ):
+        if response is None:
+            failures[name] = failures.get(name, 0) + 1
+            statement = {"model": name, "response": "", "verdict": None, "position": None, "failed": True}
+        else:
+            statement = {
+                "model": name,
+                "response": (response.get("content") or "").strip(),
+                "verdict": None,
+                "position": None,
+                "failed": False,
+            }
+        round_zero_statements.append(statement)
+        yield {
+            "type": "consensus_model_complete",
+            "data": {"round": 0, "statement": statement},
+        }
+
+    rounds.append({
+        "round": 0,
+        "statements": round_zero_statements,
+        "votes": {"yes": [], "no": []},
+        "reached": False,
+    })
+    yield {
+        "type": "consensus_round_complete",
+        "data": {"round": 0, "votes": {"yes": [], "no": []}, "reached": False},
+    }
+
+    # ------------------------------------------------------------------
+    # DEBATE ROUNDS 1..N
+    # ------------------------------------------------------------------
+    for round_num in range(1, max_rounds + 1):
+        active = active_configs()
+        if len(active) < CONSENSUS_MIN_QUORUM:
+            print(f"[consensus] Quorum lost ({len(active)} active); moving to synthesis.")
+            break
+
+        yield {"type": "consensus_round_start", "data": {"round": round_num}}
+
+        def builder(cfg, _rn=round_num):
+            transcript = _format_transcript(rounds, cfg["name"])
+            return [{"role": "user", "content": _build_debate_prompt(
+                user_query, _rn, max_rounds, transcript, chairman_note
+            )}]
+
+        statements = []
+        yes_voters, no_voters = [], []
+
+        for name, response in await run_round_parallel(active, builder):
+            if response is None:
+                failures[name] = failures.get(name, 0) + 1
+                statement = {"model": name, "response": "", "verdict": None, "position": None, "failed": True}
+            else:
+                raw = (response.get("content") or "").strip()
+                verdict, position, display = parse_verdict_text(raw)
+                statement = {
+                    "model": name,
+                    "response": display,
+                    "verdict": verdict,
+                    "position": position,
+                    "failed": False,
+                }
+                if verdict == "YES":
+                    yes_voters.append(name)
+                else:
+                    # Missing/malformed verdict counts as NO — cautious by default
+                    no_voters.append(name)
+                    if verdict is None:
+                        statement["verdict"] = "NO"
+                        statement["malformed"] = True
+
+            statements.append(statement)
+            yield {
+                "type": "consensus_model_complete",
+                "data": {"round": round_num, "statement": statement},
+            }
+
+        voters = len(yes_voters) + len(no_voters)
+        reached = voters > 0 and (len(yes_voters) * 2 > voters)
+
+        review_data = None
+        if reached:
+            # Chairman (a participant, abstained from voting) verifies alignment
+            yes_positions = [
+                {"model": s["model"], "position": s["position"] or s["response"]}
+                for s in statements if s["verdict"] == "YES"
+            ]
+            review_response, reviewer_cfg = await query_chairman(
+                [{"role": "user", "content": _build_review_prompt(user_query, yes_positions)}]
+            )
+            review_data = _parse_review((review_response or {}).get("content") or "")
+            if not (review_response or {}).get("content"):
+                # No chairman candidate could be queried — accept the majority
+                review_data = {
+                    "aligned": True,
+                    "reasoning": "Chairman review unavailable; accepting majority vote.",
+                }
+                reviewer_cfg = chairman
+
+            review_data["reviewer"] = (
+                f"{reviewer_cfg['name']} (acting)" if reviewer_cfg["model"] != chairman["model"]
+                else reviewer_cfg["name"]
+            )
+            yield {"type": "consensus_chairman_review", "data": review_data}
+
+            if review_data["aligned"]:
+                reached = True
+                rounds.append({
+                    "round": round_num,
+                    "statements": statements,
+                    "votes": {"yes": yes_voters, "no": no_voters},
+                    "reached": True,
+                    "review": review_data,
+                })
+                yield {
+                    "type": "consensus_round_complete",
+                    "data": {"round": round_num, "votes": {"yes": yes_voters, "no": no_voters}, "reached": True},
+                }
+                consensus_declared = True
+                break
+            else:
+                # Positions conflicted — force another reconciliation round
+                chairman_note = (
+                    f"In the previous round a majority voted YES, but your review found their "
+                    f"final positions materially conflicting ({review_data['reasoning']}). "
+                    f"This round exists solely to reconcile those differences."
+                )
+                reached = False
+
+        rounds.append({
+            "round": round_num,
+            "statements": statements,
+            "votes": {"yes": yes_voters, "no": no_voters},
+            "reached": reached,
+            **({"review": review_data} if review_data else {}),
+        })
+        yield {
+            "type": "consensus_round_complete",
+            "data": {"round": round_num, "votes": {"yes": yes_voters, "no": no_voters}, "reached": reached},
+        }
+
+    # ------------------------------------------------------------------
+    # CHAIRMAN SYNTHESIS
+    # ------------------------------------------------------------------
+    yield {"type": "consensus_chairman_start", "data": {}}
+
+    last_statements = rounds[-1]["statements"] if rounds else []
+    final_positions = [s for s in last_statements if not s.get("failed")]
+    dissent = [s for s in final_positions if s.get("verdict") == "NO"]
+
+    synthesis_response, synthesis_cfg = await query_chairman(
+        [{"role": "user", "content": _build_synthesis_prompt(
+            user_query,
+            _format_transcript(rounds, chairman["name"]),
+            final_positions,
+            dissent,
+            consensus_declared,
+        )}]
+    )
+
+    if not (synthesis_response or {}).get("content"):
+        synthesis = {
+            "model": f"Chairman ({chairman['name']})",
+            "response": "Error: All chairman candidates failed to respond — no synthesis could be produced.",
+        }
+    else:
+        label = (
+            f"Chairman ({synthesis_cfg['name']}, acting)"
+            if synthesis_cfg["model"] != chairman["model"]
+            else f"Chairman ({synthesis_cfg['name']})"
+        )
+        synthesis = {
+            "model": label,
+            "response": (synthesis_response.get("content") or "").strip(),
+        }
+    yield {"type": "consensus_synthesis_complete", "data": synthesis}
+
+
+async def get_free_models_endpoint() -> List[Dict[str, Any]]:
+    """Convenience wrapper for the API endpoint."""
+    return await get_free_models()

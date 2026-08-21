@@ -1,15 +1,16 @@
-# CLAUDE.md - Technical Notes for Model Behavior by Niiblr
+# CLAUDE.md - Technical Notes for Conclave by Niiblr
 
 This file contains technical details, architectural decisions, and important implementation notes for future development sessions.
 
 ## Project Overview
 
-Model Behavior by Niiblr is a multi-stage deliberation system where multiple LLMs collaboratively answer user questions. The system supports two modes:
+Conclave by Niiblr is a multi-stage deliberation system where multiple LLMs collaboratively answer user questions. The system supports three modes:
 
 - **Council Mode** (original): 3-stage process — individual responses, peer rankings, chairman synthesis
-- **Hybrid Mode** (new): 4-phase process — Socratic, Debate, Devil's Advocate, Chairman Synthesis
+- **Debate Mode** (formerly "Hybrid"): 4-phase process — Socratic, Debate, Devil's Advocate, Chairman Synthesis
+- **Consensus Mode** (new): voting-round debates between dynamically discovered free OpenRouter models until a strict majority agrees the answer has converged
 
-The key innovation in Council mode is anonymized peer review in Stage 2, preventing models from playing favorites. The key innovation in Hybrid mode is sequential phases that build on each other, forcing genuine engagement between models.
+The key innovation in Council mode is anonymized peer review in Stage 2, preventing models from playing favorites. The key innovation in Debate mode is sequential phases that build on each other, forcing genuine engagement between models. The key innovation in Consensus mode is that convergence itself — not a fixed script — decides when the debate ends, using only models that cost nothing.
 
 ---
 
@@ -50,23 +51,32 @@ The key innovation in Council mode is anonymized peer review in Stage 2, prevent
 - `_build_responses_text()`: Helper that formats model responses into readable text blocks
 - `run_hybrid_council()`: Orchestrates all four phases
 
+**`freemodels.py`**
+- Fetches the models.dev catalog (`https://models.dev/api.json`) with a 1-hour in-memory cache
+- Filters to OpenRouter models where `cost.input == 0` and `cost.output == 0`; excludes classifier/embedding/media endpoints by id/name substrings
+- Returns `{id, name (cleaned of "(free)" suffixes), context_length, description}` — ~24 models typically
+- `get_free_models(force_refresh=False)` is the entry point; used by consensus orchestration and `GET /api/models/free`
+
 **`storage.py`**
 - JSON-based conversation storage in `data/conversations/`
 - Each conversation: `{id, created_at, title, messages[]}`
 - Council assistant messages: `{role, stage1, stage2, stage3, metadata}`
 - Hybrid assistant messages: `{role, mode: "hybrid", hybrid_phase1, hybrid_phase2, hybrid_phase3, hybrid_phase4, stage1: [], stage2: [], stage3: null, metadata: {mode: "hybrid"}}`
+- Consensus assistant messages: `{role, mode: "consensus", participants: [{id, name}], chairman: {id, name}, rounds: [{round, statements, votes: {yes, no}, reached, review?}], synthesis, ...empty legacy fields, metadata: {mode: "consensus"}}`
 - Note: Council metadata (label_to_model, aggregate_rankings) is NOT persisted — only returned via API and held in frontend state
 
 **`main.py`**
 - FastAPI app with CORS enabled for `localhost:5173` and `localhost:3000`
-- `SendMessageRequest` includes a `mode` field (default: `"council"`)
+- `SendMessageRequest` includes `mode` plus consensus options: `model_ids`, `chairman_id`, `max_rounds` (default 4)
 
 *Endpoints:*
 - `POST /api/conversations/{id}/message` — non-streaming council (legacy)
 - `POST /api/conversations/{id}/message/stream` — streaming council mode (SSE)
-- `POST /api/conversations/{id}/message/stream/hybrid` — streaming hybrid mode (SSE)
-- `GET /api/conversations/{id}/export` — markdown export (handles both modes)
-- `GET /api/conversations/{id}/export/html` — HTML export (handles both modes)
+- `POST /api/conversations/{id}/message/stream/hybrid` — streaming debate mode (SSE)
+- `POST /api/conversations/{id}/message/stream/consensus` — streaming consensus debates (SSE); validates ≥3 model_ids and chairman ∈ model_ids
+- `GET /api/models/free` — free OpenRouter roster from models.dev
+- `GET /api/conversations/{id}/export` — markdown export (handles all three modes)
+- `GET /api/conversations/{id}/export/html` — HTML export (handles all three modes)
 - `DELETE /api/conversations/{id}/messages` — clear messages
 - `DELETE /api/conversations/{id}` — delete conversation
 - `PUT /api/conversations/{id}/title` — rename conversation
@@ -74,14 +84,19 @@ The key innovation in Council mode is anonymized peer review in Stage 2, prevent
 *Streaming events — Council mode:*
 `stage1_start` → `stage1_complete` → `stage2_start` → `stage2_complete` → `stage3_start` → `stage3_complete` → `title_complete` → `complete`
 
-*Streaming events — Hybrid mode:*
+*Streaming events — Debate mode:*
 `hybrid_phase1_start` → `hybrid_phase1_complete` → `hybrid_phase2_start` → `hybrid_phase2_complete` → `hybrid_phase3_start` → `hybrid_phase3_complete` → `hybrid_phase4_start` → `hybrid_phase4_complete` → `title_complete` → `complete`
 
+*Streaming events — Consensus mode:*
+`consensus_start` → (`consensus_round_start {round}` → `consensus_model_complete {round, statement}` × N → `consensus_round_complete {round, votes, reached}` [`consensus_chairman_review {aligned, reasoning, reviewer}`]) × rounds → `consensus_chairman_start` → `consensus_synthesis_complete {model, response}` → `title_complete` → `complete`
+- The endpoint in main.py accumulates these events into the stored message shape while re-emitting them to the client
+
 *Export logic:*
-- Both export endpoints check `message.get("mode") == "hybrid"` to branch between council and hybrid rendering
+- Export endpoints branch on `message.get("mode")`: `"consensus"` → rounds/votes/review/synthesis rendering; `"hybrid"` → phase rendering; else council stages
 - Council MD export: Stage 1, Stage 2, Stage 3 sections
 - Hybrid MD export: Phase 1 through Phase 4 sections
-- HTML export renders both modes with tabbed interfaces; hybrid gets a dark purple header bar
+- Consensus export renders participants/chairman, per-round vote summaries, chairman review verdicts, final-position quotes, and the synthesis
+- HTML export renders all three modes with tabbed/card interfaces; hybrid gets a dark purple header bar, consensus an emerald one
 - Title escaping includes `&`, `"`, `<`, `>`, and `'` (as `&#39;`) to prevent broken HTML
 - "Devil's Advocate" is written as "Devils Advocate" in JS string literals inside the HTML template to avoid apostrophe syntax errors
 
@@ -144,9 +159,18 @@ The key innovation in Council mode is anonymized peer review in Stage 2, prevent
 - **Phase 4 (Synthesis)** passes all three prior phases in full so Chairman has complete context
 - Each phase prompt includes the full text of previous phases — context grows with each step
 
+### Consensus Mode Design
+- **Dynamic roster, not config** — participants come from the frontend-selected `model_ids` resolved against the freemodels catalog; `config.py` is untouched by this mode
+- **Verdict format is parsed, not trusted** — each debate statement must end with `CONSENSUS: YES|NO` + `FINAL POSITION:`; regexes in `council.py` strip this block from the displayed text. A missing/malformed verdict counts as NO (cautious default)
+- **Strict majority** — yes_votes × 2 > total_votes ends the round; the Chairman then reviews whether YES-voters' final positions are ALIGNED or CONFLICTED. CONFLICTED forces one more reconciliation round via a chairman note injected into the next round's prompts
+- **Chairman fallback chain** — designated chairman first, then other healthy participants; whoever answers becomes "(acting)" chairman for review/synthesis. If everyone fails, review defaults to accepting the majority rather than looping forever
+- **Failure policy** — a model that fails twice consecutively is dropped; quorum ≥3 required to keep debating; failed statements persist as `{failed: true}` so the UI can badge them
+- **Rate limits are the norm** — OpenRouter free endpoints get globally saturated (observed: Gemma free models 429ing continuously); the 429 exponential-backoff retry in `openrouter.py` plus 5s stagger between launches is the mitigation. Design UI/tests assuming some participants die mid-debate
+- **max_rounds=4 hard cap** — after cap without majority, synthesis proceeds anyway with the Chairman judging shared ground
+
 ### Mode Selector Placement
-- Mode selector sits above the textarea, not in the header — it's part of the compose action
-- Mode persists within a conversation session but resets on page reload
+- Mode selector sits inside the composer card (segmented control), not the header — it's part of the compose action
+- Mode locks to a conversation once the first assistant message exists (`conversationMode` detection in ChatInterface)
 - Old conversations without a `mode` field default to council rendering automatically
 
 ### Export Safety
@@ -205,6 +229,7 @@ All ReactMarkdown components should be wrapped in `<div className="markdown-cont
 5. **Module Import Errors** — always run backend as `python -m backend.main` from project root
 6. **CORS Issues** — frontend origin must match allowed origins in `main.py` CORS middleware
 7. **Config changes not taking effect** — must restart the backend; Python doesn't hot-reload config
+8. **Test live SSE features through the actual UI** — rendering a stored conversation from storage does NOT exercise live-round rendering branches (this is exactly how a `undefined.filter` crash in ConsensusView's live-round path shipped). Drive a real streaming run in the browser before calling a feature done
 
 ---
 
@@ -248,6 +273,23 @@ Phase 3 (Devil's Advocate): Chairman challenges the emerging consensus — singl
 Phase 4 (Synthesis): Chairman delivers final answer with full context — single model
     ↓
 Stream to frontend: hybrid_phase1_complete → hybrid_phase2_complete → hybrid_phase3_complete → hybrid_phase4_complete → complete
+```
+
+### Consensus Mode
+```
+User Query + selected free model_ids + chairman_id
+    ↓
+Resolve roster against freemodels catalog (OpenRouter provider)
+    ↓
+Round 0: Parallel opening statements (no vote)
+    ↓
+Rounds 1..N (max 4): Each model reads transcript, argues, votes CONSENSUS: YES|NO — staggered parallel
+    ↓
+Strict majority? → Chairman reviews ALIGNED/CONFLICTED
+    ├─ CONFLICTED → forced reconciliation round
+    └─ ALIGNED (or max rounds) → Chairman synthesis
+    ↓
+Stream per-statement events live; persist message; complete
 ```
 
 ---

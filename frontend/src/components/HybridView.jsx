@@ -7,36 +7,28 @@ const PHASE_CONFIG = [
     key: 'hybrid_phase1',
     label: '💬 Phase 1: Socratic',
     subtitle: 'All models form their initial understanding',
-    color: '#3b82f6',
-    bg: '#eff6ff',
-    border: '#bfdbfe',
+    phaseClass: 'p1',
     multi: true,
   },
   {
     key: 'hybrid_phase2',
     label: '⚔️ Phase 2: Debate',
     subtitle: 'Models challenge and respond to each other',
-    color: '#f59e0b',
-    bg: '#fffbeb',
-    border: '#fde68a',
+    phaseClass: 'p2',
     multi: true,
   },
   {
     key: 'hybrid_phase3',
-    label: '😈 Phase 3: Devil\'s Advocate',
+    label: "😈 Phase 3: Devil's Advocate",
     subtitle: 'The consensus is challenged head-on',
-    color: '#ef4444',
-    bg: '#fef2f2',
-    border: '#fecaca',
+    phaseClass: 'p3',
     multi: false,
   },
   {
     key: 'hybrid_phase4',
     label: '✨ Phase 4: Final Synthesis',
     subtitle: 'Chairman delivers the definitive answer',
-    color: '#10b981',
-    bg: '#f0fdf4',
-    border: '#a7f3d0',
+    phaseClass: 'p4',
     multi: false,
   },
 ];
@@ -78,13 +70,11 @@ function PhaseBlock({ phase, data, isLoading }) {
 
   return (
     <div
-      className="hybrid-phase-block"
-      style={{ borderColor: phase.border, backgroundColor: phase.bg }}
+      className={`hybrid-phase-block ${phase.phaseClass}`}
     >
       <button
         className="hybrid-phase-header"
         onClick={() => setIsOpen(!isOpen)}
-        style={{ color: phase.color }}
       >
         <span className="hybrid-phase-title">{phase.label}</span>
         <span className="hybrid-phase-subtitle">{phase.subtitle}</span>
@@ -95,8 +85,8 @@ function PhaseBlock({ phase, data, isLoading }) {
         <div className="hybrid-phase-body">
           {isLoading && isEmpty ? (
             <div className="hybrid-loading">
-              <div className="hybrid-spinner" style={{ borderTopColor: phase.color }} />
-              <span style={{ color: phase.color }}>Models are thinking...</span>
+              <div className="hybrid-spinner" />
+              <span>Models are thinking...</span>
             </div>
           ) : phase.multi ? (
             <ModelTabs responses={data} />

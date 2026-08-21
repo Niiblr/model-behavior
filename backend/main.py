@@ -1,10 +1,11 @@
 """FastAPI backend for LLM Council."""
 
+import os
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
@@ -22,7 +23,9 @@ from .council import (
     hybrid_phase2_debate,
     hybrid_phase3_devils_advocate,
     hybrid_phase4_synthesis,
+    run_consensus_debate_stream,
 )
+from .freemodels import get_free_models
 
 app = FastAPI(title="LLM Council API")
 
@@ -44,7 +47,11 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
-    mode: str = "council"  # "council" = original 3-stage, "hybrid" = new 4-phase debate
+    mode: str = "council"  # "council" | "hybrid" | "consensus"
+    # Consensus mode options:
+    model_ids: List[str] = []
+    chairman_id: Optional[str] = None
+    max_rounds: int = 4
 
 
 class RenameConversationRequest(BaseModel):
@@ -234,6 +241,25 @@ async def upload_file(file: UploadFile = File(...)):
         "filename": filename,
         "size": len(data)
     }
+
+
+@app.get("/api/models/free")
+async def list_free_models():
+    """
+    List all currently-free OpenRouter chat models from the models.dev catalog.
+    These models cost nothing but require OPENROUTER_API_KEY (free tier).
+    """
+    if not os.getenv("OPENROUTER_API_KEY"):
+        return {
+            "requires_key": True,
+            "models": [],
+            "error": "OPENROUTER_API_KEY is not configured. Add it to your .env file (the OpenRouter free tier costs nothing).",
+        }
+    try:
+        models = await get_free_models()
+        return {"requires_key": False, "models": models, "error": None}
+    except Exception as e:
+        return {"requires_key": False, "models": [], "error": f"Could not fetch model catalog: {e}"}
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
@@ -428,6 +454,112 @@ async def send_message_stream_hybrid(conversation_id: str, request: SendMessageR
     )
 
 
+@app.post("/api/conversations/{conversation_id}/message/stream/consensus")
+async def send_message_stream_consensus(conversation_id: str, request: SendMessageRequest):
+    """
+    Send a message and stream a consensus debate between free OpenRouter models.
+    The debate runs in rounds with majority voting; a chairman model (one of the
+    participants, abstaining from votes) verifies alignment and synthesizes.
+    """
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if len(request.model_ids) < 3:
+        raise HTTPException(status_code=400, detail="Consensus debates need at least 3 participating models.")
+    if not request.chairman_id:
+        raise HTTPException(status_code=400, detail="A chairman model must be designated.")
+    if request.chairman_id not in request.model_ids:
+        raise HTTPException(status_code=400, detail="The chairman must be one of the selected participants.")
+
+    is_first_message = len(conversation["messages"]) == 0
+
+    async def event_generator():
+        consensus_message = {
+            "role": "assistant",
+            "mode": "consensus",
+            "participants": [],
+            "chairman": None,
+            "rounds": [],
+            "synthesis": None,
+            "stage1": [],
+            "stage2": [],
+            "stage3": None,
+            "hybrid_phase1": [],
+            "hybrid_phase2": [],
+            "hybrid_phase3": None,
+            "hybrid_phase4": None,
+            "metadata": {"mode": "consensus"},
+        }
+
+        try:
+            storage.add_user_message(conversation_id, request.content)
+
+            title_task = None
+            if is_first_message:
+                title_task = asyncio.create_task(generate_conversation_title(request.content))
+
+            async for event in run_consensus_debate_stream(
+                request.content,
+                request.model_ids,
+                request.chairman_id,
+                max_rounds=request.max_rounds,
+            ):
+                etype = event["type"]
+                data = event.get("data", {})
+
+                if etype == "consensus_start":
+                    consensus_message["participants"] = data["participants"]
+                    consensus_message["chairman"] = data["chairman"]
+                elif etype == "consensus_round_start":
+                    consensus_message["rounds"].append({
+                        "round": data["round"],
+                        "statements": [],
+                        "votes": {"yes": [], "no": []},
+                        "reached": False,
+                    })
+                elif etype == "consensus_model_complete":
+                    if consensus_message["rounds"]:
+                        consensus_message["rounds"][-1]["statements"].append(data["statement"])
+                elif etype == "consensus_round_complete":
+                    if consensus_message["rounds"]:
+                        entry = consensus_message["rounds"][-1]
+                        entry["votes"] = data.get("votes", entry["votes"])
+                        entry["reached"] = data.get("reached", False)
+                elif etype == "consensus_chairman_review":
+                    if consensus_message["rounds"]:
+                        consensus_message["rounds"][-1]["review"] = data
+                elif etype == "consensus_synthesis_complete":
+                    consensus_message["synthesis"] = data
+
+                yield f"data: {json.dumps({'type': etype, 'data': data})}\n\n"
+
+            # Persist the finished message
+            current = storage.get_conversation(conversation_id)
+            current["messages"].append(consensus_message)
+            storage.save_conversation(current)
+
+            if title_task:
+                title = await title_task
+                storage.update_conversation_title(conversation_id, title)
+                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+
+        except Exception as e:
+            print(f"[consensus] Stream error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
 @app.delete("/api/conversations/{conversation_id}/messages")
 async def clear_messages(conversation_id: str):
     """Clear all messages from a conversation but keep the conversation."""
@@ -492,7 +624,43 @@ async def export_conversation(conversation_id: str):
             markdown += f"{display_text}\n\n"
 
         elif message["role"] == "assistant":
-            if message.get("mode") == "hybrid":
+            if message.get("mode") == "consensus":
+                markdown += "## Consensus Mode Debate\n\n"
+
+                participants = message.get("participants", [])
+                chairman = message.get("chairman") or {}
+                if participants:
+                    names = ", ".join(p["name"] for p in participants)
+                    markdown += f"**Participants:** {names}\n\n"
+                if chairman:
+                    markdown += f"**Chairman (non-voting):** {chairman.get('name', '')}\n\n"
+
+                for round_entry in message.get("rounds", []):
+                    round_label = f"Round {round_entry['round']}"
+                    if round_entry.get("reached"):
+                        round_label += " — Majority Consensus"
+                    markdown += f"### {round_label}\n\n"
+
+                    votes = round_entry.get("votes") or {}
+                    if votes.get("yes") or votes.get("no"):
+                        markdown += f"*Votes — YES: {', '.join(votes.get('yes', [])) or 'none'} · NO: {', '.join(votes.get('no', [])) or 'none'}*\n\n"
+
+                    review = round_entry.get("review")
+                    if review:
+                        verdict = "ALIGNED" if review.get("aligned") else "CONFLICTED"
+                        markdown += f"**Chairman review ({review.get('reviewer', 'Chairman')}):** {verdict} — {review.get('reasoning', '')}\n\n"
+
+                    for stmt in round_entry.get("statements", []):
+                        markdown += f"**{stmt['model']}:**\n\n{stmt['response']}\n\n"
+                        if stmt.get("position"):
+                            markdown += f"> **Final position:** {stmt['position']}\n\n"
+
+                synthesis = message.get("synthesis") or {}
+                if synthesis.get("response"):
+                    markdown += "### Council Consensus (Final Synthesis)\n\n"
+                    markdown += f"**{synthesis['model']}:**\n\n{synthesis['response']}\n\n"
+
+            elif message.get("mode") == "hybrid":
                 markdown += "## Debate Mode Council Response\n\n"
 
                 markdown += "### Phase 1: Socratic (Initial Responses)\n\n"
@@ -552,7 +720,24 @@ async def export_conversation_html(conversation_id: str):
                 "content": message["content"]
             })
         elif message["role"] == "assistant":
-            if message.get("mode") == "hybrid":
+            if message.get("mode") == "consensus":
+                sections.append({
+                    "type": "consensus",
+                    "participants": message.get("participants", []),
+                    "chairman": message.get("chairman") or {},
+                    "rounds": [
+                        {
+                            "round": r.get("round"),
+                            "statements": r.get("statements", []),
+                            "votes": r.get("votes") or {},
+                            "reached": bool(r.get("reached")),
+                            "review": r.get("review"),
+                        }
+                        for r in message.get("rounds", [])
+                    ],
+                    "synthesis": message.get("synthesis") or {},
+                })
+            elif message.get("mode") == "hybrid":
                 sections.append({
                     "type": "hybrid",
                     "hybrid_phase1": message.get("hybrid_phase1", []),
@@ -655,6 +840,66 @@ async def export_conversation_html(conversation_id: str):
       font-weight: 700;
       font-size: 15px;
     }}
+    .consensus-header {{
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #064e3b, #059669);
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+    }}
+    .consensus-meta {{
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 12px 20px 0;
+      font-size: 13px;
+      color: #64748b;
+    }}
+    .consensus-meta strong {{ color: #1e293b; }}
+    .vote-tally {{
+      display: inline-flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }}
+    .vote-yes, .vote-no {{
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .vote-yes {{ background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }}
+    .vote-no {{ background: #ffe4e6; color: #9f1239; border: 1px solid #fda4af; }}
+    .debate-statement {{
+      margin-bottom: 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }}
+    .debate-statement .model-label {{
+      padding: 8px 16px 0;
+      margin-bottom: 0;
+    }}
+    .debate-statement .md-content {{
+      border: none;
+      border-radius: 0;
+    }}
+    .position-box {{
+      padding: 10px 16px;
+      background: #f0fdf4;
+      border-top: 1px solid #a7f3d0;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #065f46;
+    }}
+    .review-box {{
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      line-height: 1.6;
+    }}
+    .review-box.aligned {{ background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }}
+    .review-box.conflicted {{ background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }}
     .stage-block {{ padding: 20px 24px; border-bottom: 1px solid #f1f5f9; }}
     .stage-block:last-child {{ border-bottom: none; }}
     .stage-heading {{
@@ -843,6 +1088,56 @@ async def export_conversation_html(conversation_id: str):
           }
           html += '</div>';
         });
+        div.innerHTML = html;
+
+      } else if (section.type === 'consensus') {
+        div.className += ' assistant-message';
+
+        const participantNames = (section.participants || []).map(p => escHtml(p.name)).join(', ');
+        let html = '<div class="consensus-header">&#x1F91D; Consensus Mode &#x2014; Majority-vote debate</div>';
+        html += `<div class="consensus-meta">` +
+          `<span><strong>Participants:</strong> ${participantNames}</span>` +
+          `<span><strong>Chairman:</strong> ${escHtml((section.chairman && section.chairman.name) || '')}</span>` +
+          `</div>`;
+
+        (section.rounds || []).forEach(round => {
+          const label = round.reached
+            ? `Round ${round.round} &#x2014; Majority Consensus`
+            : `Round ${round.round}`;
+          html += `<div class="stage-block"><div class="stage-heading">${label}</div>`;
+
+          const votes = round.votes || {};
+          if ((votes.yes || []).length || (votes.no || []).length) {
+            html += `<div class="vote-tally">` +
+              `<span class="vote-yes">YES: ${(votes.yes || []).length}</span>` +
+              `<span class="vote-no">NO: ${(votes.no || []).length}</span></div>`;
+          }
+
+          if (round.review) {
+            const cls = round.review.aligned ? 'aligned' : 'conflicted';
+            const verdict = round.review.aligned ? 'ALIGNED' : 'CONFLICTED';
+            html += `<div class="review-box ${cls}">` +
+              `<strong>Chairman review: ${verdict}</strong> &#x2014; ${escHtml(round.review.reasoning || '')}</div>`;
+          }
+
+          (round.statements || []).forEach(stmt => {
+            html += `<div class="debate-statement">` +
+              `<div class="model-label">${escHtml(stmt.model)}</div>` +
+              `<div class="md-content">${md(stmt.response)}</div>`;
+            if (stmt.position) {
+              html += `<div class="position-box"><strong>Final position:</strong> ${md(stmt.position)}</div>`;
+            }
+            html += `</div>`;
+          });
+
+          html += `</div>`;
+        });
+
+        const syn = section.synthesis || {};
+        html += `<div class="stage-block stage3-block"><div class="stage-heading">Council Consensus</div>` +
+          `<div class="model-label">${escHtml(syn.model || '')}</div>` +
+          `<div class="md-content">${md(syn.response)}</div></div>`;
+
         div.innerHTML = html;
 
       } else {

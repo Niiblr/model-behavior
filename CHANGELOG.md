@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2026-08-21]
+
+### backend/freemodels.py | backend/council.py | backend/main.py | frontend/src/components/ConsensusView.jsx | frontend/src/components/ModelPicker.jsx
+
+#### Added
+- **?? Consensus Mode - free models debate until they actually agree** - A third deliberation mode in which the user assembles an ad-hoc council from any currently-free OpenRouter models and the council debates in voting rounds until a strict majority agrees the answer has converged. Flow: opening statements -> up to 4 debate rounds where each model argues and ends with `CONSENSUS: YES|NO` plus its final position -> strict majority ends the debate -> the Chairman verifies the majority's positions genuinely align (a conflict forces a reconciliation round) -> Chairman synthesis noting any dissent. Identities stay visible during the debate; display names are cleaned of vendor prefixes to reduce brand bias.
+  - *Model discovery:* new `backend/freemodels.py` fetches the models.dev catalog (1-hour cache), filters OpenRouter models with zero input AND zero output cost, excludes classifier/embedding/media endpoints, and exposes ~24 free chat models with cleaned display names and context lengths. New `GET /api/models/free` endpoint returns the roster (with a helpful error when no key is set).
+  - *Orchestration:* `run_consensus_debate_stream()` in `council.py` is an async generator yielding SSE-ready events (`consensus_start`, `consensus_round_start`, `consensus_model_complete`, `consensus_round_complete`, `consensus_chairman_review`, `consensus_chairman_start`, `consensus_synthesis_complete`) so the frontend witnesses every statement as it lands.
+  - *Chairman rules:* the Chairman is one of the selected participants and abstains from voting. If the Chairman's endpoint dies mid-debate (common on free tiers), another healthy participant steps in and is labeled "(acting)" in the review and synthesis.
+  - *Resilience:* per-model timeout of 300s, staggered OpenRouter launches (5s apart) to respect free-tier rate limits, models failing twice are dropped from the roster, debate continues while quorum >= 3 holds.
+  - *Frontend:* new `ModelPicker` (searchable checkbox roster with context sizes, chairman dropdown, collapsible) and `ConsensusView` (live debate feed with skeleton placeholders for pending models, per-statement vote badges, round tally bar with majority marker, chairman-review notes, green synthesis block). Statements stream in one by one via `POST /api/conversations/{id}/message/stream/consensus`.
+  - *Storage & export:* messages persist as `mode: "consensus"` with `participants`, `chairman`, `rounds[]` (statements, votes, review) and `synthesis`. Markdown and HTML exports render rounds, tallies, reviews, and the synthesis.
+- **?? Dark / light theme** - Full design-token system in `index.css` (surfaces, text, borders, per-mode accents: council=blue, debate=violet, consensus=emerald). A theme toggle in the sidebar switches `[data-theme]` on `<html>`, persists to localStorage, and defaults to the OS preference. All component CSS now uses tokens.
+- **Header overflow menu** - The four always-visible colored header buttons were replaced by an inline-editable title (click to rename) and a "..." overflow menu holding Export Markdown / Export HTML / Clear Messages / Delete Conversation.
+
+#### Changed
+- **Composer redesign** - The mode selector moved into a unified composer card at the bottom of the chat: segmented control with per-mode accents, model roster for Consensus mode, textarea row, and a send button whose label follows the mode ("Convene Council" / "Begin Debate" / "Call the Vote"). All remaining inline styles in `ChatInterface.jsx` migrated to CSS.
+- **Progress rail** - The single loading line was replaced by a live progress rail showing the current stage/phase/round, contextual notes, and step chips for Council and Debate modes.
+- **Sidebar is a real component** - Brand header, new-conversation button, ping button, and theme toggle now live in `Sidebar.jsx` (previously inlined in `App.jsx`); conversation list restyled with tokens.
+- **HybridView theme-aware** - Phase blocks no longer hardcode light-only pastel colors via inline styles; per-phase accents come from CSS classes that adapt to both themes.
+
+#### Fixed
+- **Blank screen on live Consensus streaming** - A leftover `loadingModelNames.filter(...)` block referenced a prop that no caller supplied; it crashed React the moment a debate's first live round rendered. Removed; skeleton placeholders are handled solely by the pending-participants logic, with guards added for missing statements/participants.
+- **Broken `.venv`** - The virtualenv pointed at an uninstalled Python 3.10; rebuilt from `uv.lock` via `uv sync`.
+
+---
+
 ## [2026-03-10]
 
 ### backend/main.py | frontend/src/components/ChatInterface.jsx | frontend/src/components/ChatInterface.css
