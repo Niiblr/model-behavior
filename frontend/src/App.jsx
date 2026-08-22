@@ -414,7 +414,7 @@ function App() {
           />
         ) : (
           <div className="welcome">
-            <h1>Model Behavior</h1>
+            <h1>Conclave</h1>
             <p>
               Watch AI models deliberate. Ask a question and let a council of models answer,
               argue, and vote their way to the best response.

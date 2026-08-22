@@ -17,7 +17,7 @@ export default function Sidebar({
       <div className="sidebar-brand">
         <div className="sidebar-brand-logo">🏛️</div>
         <div className="sidebar-brand-text">
-          <h1>Model Behavior</h1>
+          <h1>Conclave</h1>
           <span>by Niiblr</span>
         </div>
       </div>
